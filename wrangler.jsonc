@@ -1,0 +1,55 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "discord-party-bot-local",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-05",
+  "vars": {
+    "DISCORD_APPLICATION_ID": "",
+    "DISCORD_PUBLIC_KEY": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "discord-party-local",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  },
+  "env": {
+    "staging": {
+      "name": "discord-party-bot-staging",
+      "vars": {
+        "DISCORD_APPLICATION_ID": "",
+        "DISCORD_PUBLIC_KEY": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "discord-party-staging",
+          "database_id": "REPLACE_STAGING_DATABASE_ID",
+          "migrations_dir": "migrations"
+        }
+      ]
+    },
+    "production": {
+      "name": "discord-party-bot",
+      "vars": {
+        "DISCORD_APPLICATION_ID": "",
+        "DISCORD_PUBLIC_KEY": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "discord-party-production",
+          "database_id": "REPLACE_PRODUCTION_DATABASE_ID",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "discord-party-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test",
+    "build": "wrangler deploy --dry-run --env= --outdir dist",
+    "db:local": "wrangler d1 migrations apply DB --local",
+    "commands:register": "node --env-file=.dev.vars scripts/register-commands.mjs",
+    "deploy": "wrangler deploy --env production"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261104.1",
+    "@types/node": "26.6.6",
+    "miniflare": "5.20261103.0-beta",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0",
+    "wrangler": "4.157.0"
+  }
+}
