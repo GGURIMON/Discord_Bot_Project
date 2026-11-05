@@ -65,7 +65,7 @@ describe('실제 로컬 D1 통합', () => {
     const guest = { ...scope, userId: '301' };
     await store.repo.act(unique(), r.id, guest, r.message_id!, 'join');
     const full = await handler.handle(click);
-    expect(full.content.split('\n').slice(1)).toEqual([`<@${scope.userId}> (모집자)`, '<@301>']);
+    expect(full.content.split('\n').slice(1)).toEqual([`<@${scope.userId}> (모집자)`, '<@301>', '대기자 목록 · 0명']);
     expect(full.allowed_mentions.users).toEqual([]);
     await store.repo.act(unique(), r.id, guest, r.message_id!, 'leave');
     expect((await handler.handle(click)).content).not.toContain('<@301>');

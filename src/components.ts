@@ -53,7 +53,7 @@ export function recruitmentMessage(recruitment: Recruitment, notify = false, now
       button(`r:${recruitment.id}:join`, '참가하기', 3, closed),
       button(`r:${recruitment.id}:leave`, '참가 취소', 2, closed),
       button(`r:${recruitment.id}:askCancel`, '모집 취소', 4, closed),
-      button(`r:${recruitment.id}:members`, '참가자 목록 보기'),
+      button(`r:${recruitment.id}:members`, '참가자·대기자 목록'),
     ), row(button(`r:${recruitment.id}:edit`, '내용 수정', 2, closed), button(`r:${recruitment.id}:manage`, '모집 관리', 2, closed), button(`r:${recruitment.id}:transferInbox`, '위임 수락/거절', 2, closed))],
     allowed_mentions: notify ? { parse: [], roles, users: [], replied_user: false } : NO_MENTIONS,
   };

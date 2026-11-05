@@ -105,3 +105,21 @@ it('수정은 기존 글 유지, 정원 감소/권한 변경 방어 및 재멘�
   expect(fake.messages.get(r.message_id!)!.allowed_mentions.roles).toEqual([]);
   expect(fake.messages.get(r.message_id!)!.content).not.toContain('변경 내역');
 });
+
+it('원본이 만원이고 대기가 있어도 복사 게시 후 새 명단에는 모집자만 표시한다', async () => {
+  const {r, act, fake} = await setup('2');
+  await act('301', 'join');
+  await act('302', 'join');
+  const handler = new Interactions(store.repo, fake.client());
+  const id = event();
+  const base = {id, application_id:'999', token:'x', type:3, guild_id:scope.guildId,
+    channel_id:scope.channelId, member:{user:{id:scope.userId}}};
+  const panel = await handler.handle({...base,data:{custom_id:'copy',values:[r.id]}});
+  const publish = panel.components[0]!.components![1]!.custom_id!;
+  await handler.handle({...base,id:event(),data:{custom_id:publish}});
+  const copy = (await store.repo.recruitment(id))!;
+  const roster = async (rid:string, mid:string) => (await handler.handle({...base,id:event(),
+    message:{id:mid},data:{custom_id:`r:${rid}:members`}})).content;
+  expect(await roster(id,copy.message_id!)).toBe(`참가자 목록 · 1명\n<@${scope.userId}> (모집자)\n대기자 목록 · 0명`);
+  expect(await roster(r.id,r.message_id!)).toContain('대기자 목록 · 1명\n1. <@302>');
+});

@@ -111,7 +111,7 @@ export class Interactions {
       if (!messageId) throw new UserError('모집 메시지를 확인할 수 없습니다.');
       const members = await this.repo.participants(id, scope, messageId);
       const waiting = await this.repo.db.prepare('SELECT user_id FROM waiting WHERE recruitment_id=? AND promoted=0 ORDER BY sequence').bind(id).all<{user_id:string}>();
-      const allLines = [...members.map(member => `<@${member.user_id}>${member.user_id === member.owner_id ? ' (모집자)' : ''}`), ...(waiting.results.length ? [`대기자 목록 · ${waiting.results.length}명`, ...waiting.results.map((u,i)=>`${i+1}. <@${u.user_id}>`)] : [])];
+      const allLines = [...members.map(member => `<@${member.user_id}>${member.user_id === member.owner_id ? ' (모집자)' : ''}`), `대기자 목록 · ${waiting.results.length}명`, ...waiting.results.map((u,i)=>`${i+1}. <@${u.user_id}>`)];
       const pageSize = 40;
       const pages = Math.ceil(allLines.length / pageSize);
       const requested = Number(pageText ?? 0);
