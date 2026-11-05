@@ -54,7 +54,7 @@ export function recruitmentMessage(recruitment: Recruitment, notify = false, now
       button(`r:${recruitment.id}:leave`, '참가 취소', 2, closed),
       button(`r:${recruitment.id}:askComplete`, '모집 완료', 3, closed),
       button(`r:${recruitment.id}:askCancel`, '모집 취소', 4, closed),
-    ), row({type:3,custom_id:`r:${recruitment.id}:menu`,placeholder:'명단 · 모집 관리',
+    ), row({type:3,custom_id:`r:${recruitment.id}:menu`,placeholder:'모집글 설정',
       options: managementOptions.filter(([value])=>!closed || value === 'members').map(([value,label])=>({value,label}))})],
     allowed_mentions: notify ? { parse: [], roles, users: [], replied_user: false } : NO_MENTIONS,
   };
