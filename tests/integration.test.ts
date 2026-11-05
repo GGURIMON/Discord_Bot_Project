@@ -56,6 +56,23 @@ describe('실제 로컬 D1 통합', () => {
     await sync.run(r.id);
     expect(fake.messages.get(r.message_id!)!.components[0]!.components![0]!.disabled).toBe(false);
   });
+  it('참가자 목록은 모집자 우선이며 참가·탈퇴와 마감 상태를 반영한다', async () => {
+    const { r, fake } = await published({ maximum: '2' });
+    const handler = new Interactions(store.repo, fake.client());
+    const click: Interaction = { id: unique(), application_id: '999', token: 'token', type: 3,
+      guild_id: scope.guildId, channel_id: scope.channelId, member: { user: { id: '301' } },
+      message: { id: r.message_id! }, data: { custom_id: `r:${r.id}:members` } };
+    const guest = { ...scope, userId: '301' };
+    await store.repo.act(unique(), r.id, guest, r.message_id!, 'join');
+    const full = await handler.handle(click);
+    expect(full.content.split('\n').slice(1)).toEqual([`<@${scope.userId}> (모집자)`, '<@301>']);
+    expect(full.allowed_mentions.users).toEqual([]);
+    await store.repo.act(unique(), r.id, guest, r.message_id!, 'leave');
+    expect((await handler.handle(click)).content).not.toContain('<@301>');
+    await store.repo.act(unique(), r.id, scope, r.message_id!, 'cancel');
+    expect((await handler.handle(click)).content).toContain('(모집자)');
+    await expect(handler.handle({ ...click, channel_id: 'wrong' })).rejects.toThrow('사용할 수 없는 모집');
+  });
   it('같은 사용자 동시 참가 및 같은 interaction은 한 번만 반영', async () => {
     const { r } = await published();
     const id = unique();
@@ -74,8 +91,9 @@ describe('실제 로컬 D1 통합', () => {
     expect(await store.repo.act(unique(), r.id, scope, r.message_id!, 'cancel')).toBe('cancelled');
     await sync.run(r.id);
     const body = fake.messages.get(r.message_id!)!;
+    expect(body.components[0]!.components![3]!.disabled).toBe(false);
     expect(body.content).toMatch(/^\[취소됨\]/);
-    expect(body.components[0]!.components!.every(button => button.disabled)).toBe(true);
+    expect(body.components[0]!.components!.slice(0, 3).every(button => button.disabled)).toBe(true);
     expect(await store.repo.act(unique(), r.id, { ...scope, userId: '301' }, r.message_id!, 'join')).toBe('closed');
   });
   it('다른 서버/채널/메시지의 조작 거부', async () => {

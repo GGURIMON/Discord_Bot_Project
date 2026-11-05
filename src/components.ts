@@ -50,6 +50,7 @@ export function recruitmentMessage(recruitment: Recruitment, notify = false, now
       button(`r:${recruitment.id}:join`, '참가하기', 3, closed || recruitment.member_count >= recruitment.max_members),
       button(`r:${recruitment.id}:leave`, '참가 취소', 2, closed),
       button(`r:${recruitment.id}:askCancel`, '모집 취소', 4, closed),
+      button(`r:${recruitment.id}:members`, '참가자 목록 보기'),
     )],
     allowed_mentions: notify ? { parse: [], roles, users: [], replied_user: false } : NO_MENTIONS,
   };

@@ -79,7 +79,26 @@ export class Interactions {
     const customId = interaction.data?.custom_id ?? '';
     if (customId.startsWith('d:')) return this.handleDraft(interaction, scope);
     if (customId === 'dismiss') return privateText('모집 취소를 중단했습니다.');
-    const [prefix, id, action, sourceMessage] = customId.split(':');
+    const [prefix, id, action, sourceMessage, pageText] = customId.split(':');
+    if (prefix === 'r' && id && (action === 'members' || action === 'membersPage')) {
+      const messageId = action === 'members' ? interaction.message?.id : sourceMessage;
+      if (!messageId) throw new UserError('모집 메시지를 확인할 수 없습니다.');
+      const members = await this.repo.participants(id, scope, messageId);
+      const pageSize = 50;
+      const pages = Math.ceil(members.length / pageSize);
+      const requested = Number(pageText ?? 0);
+      const page = Number.isSafeInteger(requested) ? Math.max(0, Math.min(requested, pages - 1)) : 0;
+      const lines = members.slice(page * pageSize, (page + 1) * pageSize)
+        .map(member => `<@${member.user_id}>${member.user_id === member.owner_id ? ' (모집자)' : ''}`);
+      const panel = privateText([`참가자 목록 · ${members.length}명`, ...lines].join('\n'));
+      if (pages > 1) {
+        const key = `r:${id}:membersPage:${messageId}`;
+        panel.content += `\n${page + 1}/${pages}페이지`;
+        panel.components = [row(button(`${key}:${page - 1}`, '이전', 2, page === 0),
+          button(`${key}:${page + 1}`, '다음', 2, page === pages - 1))];
+      }
+      return panel;
+    }
     if (prefix !== 'r' || !id || !action || !['join', 'leave', 'askCancel', 'cancel'].includes(action)) throw new UserError('지원하지 않는 버튼입니다.');
     const messageId = action === 'cancel' ? sourceMessage : interaction.message?.id;
     if (!messageId) throw new UserError('모집 메시지를 확인할 수 없습니다.');

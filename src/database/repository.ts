@@ -45,6 +45,15 @@ export class Repository {
     return this.db.prepare(`SELECT r.*, (SELECT COUNT(*) FROM participants WHERE recruitment_id=r.id) AS member_count FROM recruitments r WHERE id=?`)
       .bind(id).first<Recruitment>();
   }
+  async participants(id: string, scope: Scope, messageId: string) {
+    const result = await this.db.prepare(`SELECT p.user_id, r.owner_id FROM participants p
+      JOIN recruitments r ON r.id=p.recruitment_id
+      WHERE r.id=? AND r.guild_id=? AND r.channel_id=? AND r.message_id=?
+      ORDER BY (p.user_id=r.owner_id) DESC, p.joined_at, p.user_id`)
+      .bind(id, scope.guildId, scope.channelId, messageId).all<{ user_id: string; owner_id: string }>();
+    if (!result.results.length) throw new UserError('사용할 수 없는 모집입니다.');
+    return result.results;
+  }
   async act(interactionId: string, id: string, scope: Scope, messageId: string, action: 'join' | 'leave' | 'cancel', now = Date.now()): Promise<string> {
     const claim = crypto.randomUUID();
     // 판정·참가 변경·결과 저장을 같은 batch로 묶어 재전송과 동시 조작을 분리한다.
