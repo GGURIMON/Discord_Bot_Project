@@ -74,10 +74,11 @@ export class StartReminders {
         const remainingMs = r.starts_at-this.clock();
         if (remainingMs<=0) return;
         const remaining = remainingMs<minute ? '시작까지 1분 미만입니다' : `시작 ${Math.ceil(remainingMs/minute)}분 전입니다`;
-        const title = start===0 ? `🎮 ${game.slice(0,110)} — ${remaining}!\n게임 시작 예정: ${clockTime(r.starts_at)}\n\n` : '';
+        const [hour, minuteText] = clockTime(r.starts_at).split(':');
+        const title = start===0 ? `🎮 ${game.slice(0,110)} — ${remaining}!\n게임 시작 예정: ${hour}시 ${minuteText}분\n\n` : '';
         const mentions = chunk.map(user=>`<@${user}>`).join(' ');
         await this.discord.create(job.thread_id,`${id}-${start}`,{
-          content:`${title}참가자 알림\n${mentions}\n게임 시작 준비를 해주세요!`,components:[],
+          content:`${title}${mentions} 게임 시작 준비를 해주세요!`,components:[],
           allowed_mentions:{parse:[],roles:[],users:chunk,replied_user:false}
         });
         job.position+=chunk.length;

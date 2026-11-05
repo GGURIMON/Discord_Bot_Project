@@ -63,6 +63,7 @@ it('두 서버의 원본에 연결하고 발송 시점 명단만 멘션한다',a
   now--;await cron();expect(createCount).toBe(0);now++;
   await Promise.all([cron(),cron()]);await cron();
   expect(createCount).toBe(2);expect(posts.size).toBe(2);
+  expect(posts.get(a.message+':'+a.id+'-0')!.content).toContain('시작 10분 전입니다!\n게임 시작 예정: 00시 10분\n\n<@300> <@302> 게임 시작 준비를 해주세요!');
   expect(posts.get(a.message+':'+a.id+'-0')!.allowed_mentions).toEqual({parse:[],users:['300','302'],roles:[],replied_user:false});
   expect(posts.get(b.message+':'+b.id+'-0')!.allowed_mentions.users).toEqual(['999']);
   now+=86400000;await cron();expect(createCount).toBe(2);
