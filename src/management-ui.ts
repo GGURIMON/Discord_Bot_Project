@@ -5,9 +5,9 @@ import { Repository } from './database/repository';
 import { emptyDraft, clockTime, seoulDate } from './domain';
 import { UserError, type Interaction, type Scope, type Recruitment, type DraftData } from './types';
 
-export async function seedDraft(repo: Repository, event: string, scope: Scope, r: Recruitment, edit: boolean) {
+export async function seedDraft(repo: Repository, event: string, scope: Scope, r: Recruitment, edit: boolean, copyOrigin?: string) {
   const draft = await repo.createDraft(event, scope);
-  const data: DraftData = { ...emptyDraft(),
+  const data: DraftData = { ...emptyDraft(), copyOrigin,
     customGames: JSON.parse(r.games_json).map((g: {name:string;mode?:string}) => g.name + (g.mode ? `(${g.mode})` : '')).join('\n'),
     maximum: String(r.max_members), timeText: r.time_label ?? `${clockTime(r.starts_at)} ~ ${clockTime(r.ends_at)}`,
     date: edit ? seoulDate(r.starts_at) : seoulDate(),

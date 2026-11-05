@@ -169,3 +169,20 @@ it.each([false,true])('위임 알림은 수신자만 멘션하고 재전송하�
     allowed_mentions:{users:['301'],parse:[]},content:expect.stringContaining('<@301>')});
   expect(await store.db.prepare('SELECT state FROM transfers WHERE id=?').bind(request.id).first('state')).toBe('pending');
 });
+
+it('목록과 복사 미리보기에서 취소하면 작성 중이던 원래 초안으로 돌아간다',async()=>{
+  const {r,fake}=await setup();
+  const handler=new Interactions(store.repo,fake.client());
+  const source=await store.repo.createDraft(event(),scope);
+  const original=await store.repo.saveDraft(source,validData({maximum:'7'}));
+  const click=(custom_id:string,values?:string[])=>handler.handle({id:event(),type:3,application_id:'999',token:'x',
+    guild_id:scope.guildId,channel_id:scope.channelId,member:{user:{id:scope.userId}},message:{id:'private',flags:64},data:{custom_id,values}});
+  const picker=await click(`d:${source.id}:${original.version}:recent:0`);
+  const back=await click(picker.components[1]!.components![0]!.custom_id!);
+  expect(back.content).toContain('[1/7]');
+  const preview=await click(picker.components[0]!.components![0]!.custom_id!,[r.id]);
+  const undo=preview.components[1]!.components![0]!;
+  expect(undo.label).toBe('복사 취소');
+  expect((await click(undo.custom_id!)).content).toContain('[1/7]');
+  await expect(click(preview.components[0]!.components![1]!.custom_id!)).rejects.toThrow();
+});

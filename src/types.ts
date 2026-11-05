@@ -33,6 +33,7 @@ export interface Interaction {
 export interface Scope { guildId: string; channelId: string; userId: string }
 export interface Game { name: string; mode?: string }
 export interface DraftData {
+  copyOrigin?: string;
   roleText?: string;
   roleError?: string;
   timeText?: string;

@@ -23,6 +23,12 @@ export function draftPanel(draft: Draft, page = 0, notice = '', now = Date.now()
   const components = [
     row(button(`${key}:details:${page}`, '모집 내용 입력', 1), button(`${key}:publish:${page}`, draft.edit_id ? '✅ 수정 저장' : '✅ 모집 게시', 3, Boolean(problem)), button(`${key}:discard:${page}`, '작성 취소', 4)),
   ];
+  if (!draft.edit_id) {
+    const navigation = data.copyOrigin
+      ? button(`${key}:undoCopy`, '복사 취소')
+      : button(`${key}:recent:${page}`, '내 최근 모집 복사');
+    components.push(row(navigation));
+  }
   // 미리보기는 2,000자 제한을 별도로 지키며 게시글에는 전체 내용을 쓴다.
   return { content: `${notice ? `${notice}\n\n` : ''}**모집 작성**\n${preview || problem}`.slice(0, 2000), components, allowed_mentions: NO_MENTIONS };
 }

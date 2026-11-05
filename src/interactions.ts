@@ -106,21 +106,24 @@ export class Interactions {
     const scope = getScope(interaction);
     if (interaction.type === 2) {
       if (interaction.data?.name !== '모집') throw new UserError('지원하지 않는 명령어입니다.');
-      const panel = draftPanel(await this.repo.createDraft(interaction.id, scope));
-      panel.components.push(row(button('recent','내 최근 모집 복사')));
-      return panel;
+      return draftPanel(await this.repo.createDraft(interaction.id, scope));
     }
     const customId = interaction.data?.custom_id ?? '';
-    if (customId === 'recent') {
+    const parsed = customId.startsWith('d:') ? parseDraftId(customId) : undefined;
+    if (customId === 'recent' || parsed?.action === 'recent') {
+      const source = parsed ? await this.repo.draft(parsed.id,scope) : await this.repo.createDraft(interaction.id,scope);
+      if (parsed) this.checkVersion(source,parsed.version);
+      const key = `d:${source.id}:${source.version}`;
       const recent = await this.repo.db.prepare('SELECT id,games_json FROM recruitments WHERE guild_id=? AND creator_id=? ORDER BY created_at DESC,id DESC LIMIT 5').bind(scope.guildId,scope.userId).all<{id:string;games_json:string}>();
-      if (!recent.results.length) return privateText('복사할 모집이 없습니다.');
-      return {...privateText('복사할 모집을 선택해 주세요. 기존 시간도 함께 불러옵니다.'),components:[row({type:3,custom_id:'copy',options:recent.results.map((r,i)=>({label:`${i+1}. ${JSON.parse(r.games_json).map((g:{name:string})=>g.name).join(', ')}`.slice(0,100),value:r.id}))})]};
+      if (!recent.results.length) return draftPanel(source,0,'복사할 모집이 없습니다.');
+      return {...privateText('복사할 모집을 선택해 주세요. 기존 시간도 함께 불러옵니다.'),components:[row({type:3,custom_id:`${key}:copy`,options:recent.results.map((r,i)=>({label:`${i+1}. ${JSON.parse(r.games_json).map((g:{name:string})=>g.name).join(', ')}`.slice(0,100),value:r.id}))}),row(button(`${key}:page:0`,'복사 취소'))]};
     }
-    if (customId === 'copy') {
+    if (customId === 'copy' || parsed?.action === 'copy') {
+      if (parsed) this.checkVersion(await this.repo.draft(parsed.id,scope),parsed.version);
       const r = await this.repo.recruitment(interaction.data?.values?.[0] ?? '');
       const allowed = await this.repo.db.prepare('SELECT id FROM recruitments WHERE guild_id=? AND creator_id=? ORDER BY created_at DESC,id DESC LIMIT 5').bind(scope.guildId,scope.userId).all<{id:string}>();
       if (!r || !allowed.results.some(x=>x.id===r.id)) throw new UserError('복사할 수 없는 모집입니다.');
-      return draftPanel(await seedDraft(this.repo,interaction.id,scope,r,false),0,'이전 모집을 복사했습니다. 시간과 내용을 확인한 뒤 게시해 주세요.');
+      return draftPanel(await seedDraft(this.repo,interaction.id,scope,r,false,parsed?.id),0,'이전 모집을 복사했습니다. 시간과 내용을 확인한 뒤 게시해 주세요.');
     }
     const managed = await managementUI(this.repo,this.discord,interaction,scope);
     if (managed) { const id = customId.split(':')[1]; if (id) await this.sync.run(id); return managed; }
@@ -172,6 +175,13 @@ export class Interactions {
     }
     if (parsed.action === 'page') return draftPanel(draft, parsed.page);
     this.checkVersion(draft, parsed.version);
+    if (parsed.action === 'undoCopy') {
+      const origin = (JSON.parse(draft.payload) as DraftData).copyOrigin;
+      if (!origin) throw new UserError('복사한 모집이 아닙니다.');
+      const previous = await this.repo.draft(origin,scope);
+      await this.repo.discardDraft(draft);
+      return draftPanel(previous,0,'복사를 취소했습니다.');
+    }
     if (parsed.action === 'discard') {
       await this.repo.discardDraft(draft);
       return privateText(draft.edit_id ? '모집 수정을 취소했습니다.' : '모집 작성을 취소했습니다.');
