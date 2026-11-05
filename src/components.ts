@@ -31,7 +31,7 @@ export function detailsModal(draft: Draft, page: number, roles: Role[]) {
   const field = (id: string, label: string, placeholder: string, value: string, required: boolean, max: number, style = 1): Component => ({
     type: 18, label, component: { type: 4, custom_id: id, style, required, max_length: max, placeholder, ...(value ? { value } : {}) },
   });
-  return { type: 9, data: { custom_id: `d:${draft.id}:${draft.version}:submitRoles:${page}`, title: '모집 상세 입력', components: [
+  return { type: 9, data: { custom_id: `d:${draft.id}:${draft.version}:submitRoles:${page}`, title: draft.edit_id ? '모집 내용 수정' : '모집 상세 입력', components: [
     field('gameText', '게임 이름', '증바람', data.gameIds.length ? gamesOf({ ...data, customGames: '' }).map(g => g.mode ? `${g.name}(${g.mode})` : g.name).concat(data.customGames || []).join('\n') : data.customGames, true, 1200, 2),
     field('timeText', '시간', '지금 / 13:00 / 13:00 ~ 14:30', data.timeText ?? ([data.start, data.end].filter(Boolean).join(' ~ ') || '지금'), true, 40),
     ...(roles.length ? [{
@@ -48,13 +48,13 @@ export function recruitmentMessage(recruitment: Recruitment, notify = false, now
   const closed = Boolean(recruitment.completed) || recruitment.status !== 'open' && recruitment.status !== 'publishing' || recruitment.ends_at <= now;
   const roles: string[] = JSON.parse(recruitment.role_ids_json);
   return {
-    content: formatContent(recruitment.owner_id, JSON.parse(recruitment.games_json), recruitment.starts_at, recruitment.ends_at, recruitment.member_count, recruitment.max_members, roles, recruitment.completed ? 'completed' : recruitment.status, recruitment.time_label) + (JSON.parse(recruitment.changes_json ?? '[]').length ? '\n변경 내역: ' + JSON.parse(recruitment.changes_json ?? '[]').join(' → ') : ''),
+    content: formatContent(recruitment.owner_id, JSON.parse(recruitment.games_json), recruitment.starts_at, recruitment.ends_at, recruitment.member_count, recruitment.max_members, roles, recruitment.completed ? 'completed' : recruitment.status, recruitment.time_label),
     components: [row(
       button(`r:${recruitment.id}:join`, '참가하기', 3, closed),
       button(`r:${recruitment.id}:leave`, '참가 취소', 2, closed),
       button(`r:${recruitment.id}:askCancel`, '모집 취소', 4, closed),
       button(`r:${recruitment.id}:members`, '참가자 목록 보기'),
-    ), row(button(`r:${recruitment.id}:manage`, '모집 관리', 2, closed), button(`r:${recruitment.id}:transferInbox`, '위임 수락/거절', 2, closed))],
+    ), row(button(`r:${recruitment.id}:edit`, '내용 수정', 2, closed), button(`r:${recruitment.id}:manage`, '모집 관리', 2, closed), button(`r:${recruitment.id}:transferInbox`, '위임 수락/거절', 2, closed))],
     allowed_mentions: notify ? { parse: [], roles, users: [], replied_user: false } : NO_MENTIONS,
   };
 }

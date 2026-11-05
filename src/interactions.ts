@@ -1,3 +1,4 @@
+import { scoped } from './database/management';
 import { managementUI, seedDraft } from './management-ui';
 import { GAMES } from './config/games';
 import { button, detailsModal, draftPanel, NO_MENTIONS, privateText, row } from './components';
@@ -43,7 +44,16 @@ export class Interactions {
   // Modal은 초기 응답 자체여야 한다. DB 접근에는 별도 짧은 deadline을 적용한다.
   async openModal(interaction: Interaction) {
     const scope = getScope(interaction);
-    const parsed = parseDraftId(interaction.data?.custom_id ?? '');
+    const customId = interaction.data?.custom_id ?? '';
+    const edit = /^([rm]):(\d+):edit(?::(\d+))?$/.exec(customId);
+    if (edit) {
+      const messageId = edit[1] === 'r' ? interaction.message?.id : edit[3];
+      const r = await scoped(this.repo,edit[2]!,scope,messageId ?? '',true);
+      if (r.completed || r.status !== 'open' || r.ends_at <= Date.now()) throw new UserError('마감된 모집입니다.');
+      const [draft, roles] = await Promise.all([seedDraft(this.repo,interaction.id,scope,r,true), this.discord.roles(scope.guildId)]);
+      return detailsModal(draft,0,gameRoles(roles,scope.guildId));
+    }
+    const parsed = parseDraftId(customId);
     const [draft, roles] = await Promise.all([this.repo.draft(parsed.id, scope), this.discord.roles(scope.guildId)]);
     this.checkVersion(draft, parsed.version);
     return detailsModal(draft, parsed.page, gameRoles(roles, scope.guildId));
@@ -89,7 +99,7 @@ export class Interactions {
       const r = await this.repo.recruitment(interaction.data?.values?.[0] ?? '');
       const allowed = await this.repo.db.prepare('SELECT id FROM recruitments WHERE guild_id=? AND creator_id=? ORDER BY created_at DESC,id DESC LIMIT 5').bind(scope.guildId,scope.userId).all<{id:string}>();
       if (!r || !allowed.results.some(x=>x.id===r.id)) throw new UserError('복사할 수 없는 모집입니다.');
-      return seedDraft(this.repo,interaction.id,scope,r,false);
+      return draftPanel(await seedDraft(this.repo,interaction.id,scope,r,false),0,'이전 모집을 복사했습니다. 시간과 내용을 확인한 뒤 게시해 주세요.');
     }
     const managed = await managementUI(this.repo,interaction,scope);
     if (managed) { const id = customId.split(':')[1]; if (id) await this.sync.run(id); return managed; }
@@ -199,6 +209,11 @@ export class Interactions {
       const latest = await this.repo.recruitment(recruitment.id);
       return this.publishedPanel(latest?.message_id ?? null, scope, latest?.status === 'publish_failed');
     } else throw new UserError('지원하지 않는 입력입니다.');
+    if (draft.edit_id && interaction.type === 5) {
+      await this.repo.editDraft(draft,data,scope);
+      await this.sync.run(draft.edit_id);
+      return privateText('모집글에 수정을 반영했습니다.');
+    }
     draft = await this.repo.saveDraft(draft, data);
     return draftPanel(draft, parsed.page);
   }

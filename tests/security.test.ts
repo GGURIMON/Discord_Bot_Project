@@ -55,7 +55,7 @@ describe('HTTP 서명 및 초기 응답', () => {
 });
 
 it.each([
-  ['recent', 64, 6], ['copy', 64, 6], ['m:1:edit:2', 64, 6],
+  ['recent', 64, 6], ['copy', 64, 6], ['m:1:chooseOffer:2', 64, 6],
   ['d:1:2:discard:0', 64, 6], ['r:1:manage', 0, 5],
 ])('버튼 %s의 원본 메시지에 맞게 응답한다', async (custom_id, flags, type) => {
   const mock = vi.spyOn(Interactions.prototype, 'process').mockResolvedValue();

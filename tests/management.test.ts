@@ -88,14 +88,20 @@ it('수정은 기존 글 유지, 정원 감소/권한 변경 방어 및 재멘�
   const {r,act,fake}=await setup(); await act('301','join');
   const handler=new Interactions(store.repo,fake.client());
   const base={id:event(),application_id:'999',token:'x',type:3,guild_id:scope.guildId,channel_id:scope.channelId,member:{user:{id:scope.userId}},message:{id:r.message_id!},data:{custom_id:`m:${r.id}:edit:${r.message_id}`}};
-  await handler.handle(base);
+  expect((await handler.openModal(base)).type).toBe(9);
   let d=await store.repo.draft(base.id,scope);
   const data=validData({maximum:'1'});
   await expect(store.repo.editDraft(d,data,scope)).rejects.toThrow();
-  data.maximum='3'; await store.repo.editDraft(d,data,scope);
+  const fields = {gameText:'테스트(일반)', timeText:'지금', maximum:'3'};
+  const saved = await handler.handle({...base,type:5,data:{custom_id:`d:${d.id}:${d.version}:submitRoles:0`,components:[
+    {type:18,component:{type:3,custom_id:'roleIds',values:['400']}},
+    ...Object.entries(fields).map(([custom_id,value])=>({type:18,component:{type:4,custom_id,value}}))
+  ]}});
+  expect(saved.components).toEqual([]);
+  expect((await store.repo.recruitment(r.id))!.max_members).toBe(3);
   await new MessageSync(store.repo,fake.client()).run(r.id);
   expect((await store.repo.recruitment(r.id))!.message_id).toBe(r.message_id);
   expect((await store.repo.recruitment(r.id))!.member_count).toBe(2);
   expect(fake.messages.get(r.message_id!)!.allowed_mentions.roles).toEqual([]);
-  expect(fake.messages.get(r.message_id!)!.content).toContain('변경 내역');
+  expect(fake.messages.get(r.message_id!)!.content).not.toContain('변경 내역');
 });

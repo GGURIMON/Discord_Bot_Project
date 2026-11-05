@@ -21,7 +21,7 @@ export default {
     if (![2, 3, 5].includes(interaction.type) || !interaction.id || !interaction.token) return Response.json(errorResponse('지원하지 않는 요청입니다.'));
     if (!interaction.guild_id || !interaction.channel_id || !interaction.member?.user.id) return Response.json(errorResponse('서버 채널에서 /모집을 실행해 주세요.'));
     const handler = new Interactions(new Repository(env.DB), new Discord(env.DISCORD_BOT_TOKEN));
-    if (interaction.type === 3 && /^d:\d+:\d+:details:/.test(interaction.data?.custom_id ?? '')) {
+    if (interaction.type === 3 && /^(?:d:\d+:\d+:details:|r:\d+:edit$|m:\d+:edit:\d+$)/.test(interaction.data?.custom_id ?? '')) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         return Response.json(await Promise.race([

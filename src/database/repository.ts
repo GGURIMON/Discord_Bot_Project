@@ -94,16 +94,12 @@ export class Repository {
     const claim = crypto.randomUUID();
     const r = await this.recruitment(draft.edit_id!);
     if (!r) throw new UserError('모집을 찾을 수 없습니다.');
-    const before = `${r.games_json} / ${r.time_label} / ${r.max_members} / ${r.role_ids_json}`;
-    const after = `${JSON.stringify(v.games)} / ${v.timeLabel} / ${v.maximum} / ${JSON.stringify(v.roles)}`;
-    const history = JSON.stringify([`${before} → ${after}`]);
-    if (history.length + JSON.stringify(v.games).length + v.roles.length*25 + 200 > 1900) throw new UserError('변경 내역이 너무 깁니다. 게임 설명을 줄여 주세요.');
     const result = await this.db.batch([
       this.db.prepare(`UPDATE drafts SET consumed_by=?,version=version+1 WHERE id=? AND version=? AND consumed_by IS NULL AND expires_at>?
         AND EXISTS(SELECT 1 FROM recruitments r WHERE r.id=drafts.edit_id AND r.guild_id=? AND r.channel_id=? AND r.owner_id=? AND r.status='open' AND r.completed=0 AND r.ends_at>? AND r.version=? AND (SELECT COUNT(*) FROM participants WHERE recruitment_id=r.id)<=?)`)
         .bind(claim,draft.id,draft.version,now,scope.guildId,scope.channelId,scope.userId,now,r.version,v.maximum),
-      this.db.prepare(`UPDATE recruitments SET games_json=?,role_ids_json=?,starts_at=?,ends_at=?,max_members=?,time_label=?,changes_json=? WHERE id=? AND EXISTS(SELECT 1 FROM drafts WHERE id=? AND consumed_by=?)`)
-        .bind(JSON.stringify(v.games),JSON.stringify(v.roles),v.startsAt,v.endsAt,v.maximum,v.timeLabel,history,r.id,draft.id,claim)
+      this.db.prepare(`UPDATE recruitments SET games_json=?,role_ids_json=?,starts_at=?,ends_at=?,max_members=?,time_label=? WHERE id=? AND EXISTS(SELECT 1 FROM drafts WHERE id=? AND consumed_by=?)`)
+        .bind(JSON.stringify(v.games),JSON.stringify(v.roles),v.startsAt,v.endsAt,v.maximum,v.timeLabel,r.id,draft.id,claim)
     ]);
     if (!result[0]!.meta.changes) throw new UserError('모집자, 명단 또는 모집 상태가 변경됐습니다. 정원을 확인하고 다시 시도해 주세요.');
   }

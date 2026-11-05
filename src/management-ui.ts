@@ -1,4 +1,4 @@
-import { button, row, privateText, draftPanel } from './components';
+import { button, row, privateText } from './components';
 import { manage, scoped } from './database/management';
 import { Repository } from './database/repository';
 import { emptyDraft, clockTime, seoulDate } from './domain';
@@ -13,7 +13,7 @@ export async function seedDraft(repo: Repository, event: string, scope: Scope, r
     roles: JSON.parse(r.role_ids_json).map((id:string) => ({id,name:id,mentionable:false})),
   };
   await repo.db.prepare('UPDATE drafts SET edit_id=? WHERE id=?').bind(edit ? r.id : null,draft.id).run();
-  return draftPanel({...await repo.saveDraft(draft,data),edit_id:edit ? r.id : null}, 0, edit ? '' : '이전 모집을 복사했습니다. 시간과 내용을 확인한 뒤 게시해 주세요.');
+  return {...await repo.saveDraft(draft,data),edit_id:edit ? r.id : null};
 }
 export async function managementUI(repo: Repository, interaction: Interaction, scope: Scope) {
   const [prefix,id,action,message,target] = (interaction.data?.custom_id ?? '').split(':');
@@ -26,9 +26,9 @@ export async function managementUI(repo: Repository, interaction: Interaction, s
   const key = `m:${id}`;
   if (action === 'manage') return {...privateText('모집 관리'),components:[row(
     button(`${key}:choosePromote:${msg}`,'대기자 참가 전환'),button(`${key}:chooseRestore:${msg}`,'참가 전환 복원'),
-    button(`${key}:chooseOffer:${msg}`,'권한 위임'),button(`${key}:askComplete:${msg}`,'모집 완료'),button(`${key}:edit:${msg}`,'내용 수정'))]};
-  if (action === 'edit') return seedDraft(repo,interaction.id,scope,r,true);
-  if (action === 'askComplete') return {...privateText('모집을 완료할까? 기존 명단은 유지돼.'),components:[row(button(`${key}:complete:${msg}`,'완료 확인',3),button('dismiss','돌아가기'))]};
+    button(`${key}:chooseOffer:${msg}`,'권한 위임'),button(`${key}:askComplete:${msg}`,'모집 완료'))]};
+
+  if (action === 'askComplete') return {...privateText('모집 완료 하시겠습니까?'),components:[row(button(`${key}:complete:${msg}`,'완료 확인',3),button('dismiss','돌아가기'))]};
   if (action === 'transferInbox') {
     const pending = await repo.db.prepare("SELECT id FROM transfers WHERE recruitment_id=? AND from_user=? AND to_user=? AND state='pending' AND expires_at>? ORDER BY expires_at DESC LIMIT 1").bind(id,r.owner_id,scope.userId,Date.now()).first<{id:string}>();
     if (!pending) return privateText('받은 위임 요청이 없습니다.');
