@@ -123,3 +123,18 @@ it('원본이 만원이고 대기가 있어도 복사 게시 후 새 명단에�
   expect(await roster(id,copy.message_id!)).toBe(`참가자 목록 · 1명\n<@${scope.userId}> (모집자)\n대기자 목록 · 0명`);
   expect(await roster(r.id,r.message_id!)).toContain('대기자 목록 · 1명\n1. <@302>');
 });
+
+it('관리 패널 안에서 취소를 확인하면 원본을 갱신하고 개인 확인창을 삭제한다', async () => {
+  const {r,fake} = await setup();
+  const handler = new Interactions(store.repo,fake.client());
+  const base = {id:event(),application_id:'999',token:'test',type:3,guild_id:scope.guildId,
+    channel_id:scope.channelId,member:{user:{id:scope.userId}},message:{id:r.message_id!,flags:0}};
+  const panel = await handler.handle({...base,data:{custom_id:`r:${r.id}:manage`}});
+  const buttons = panel.components.flatMap(row=>row.components ?? []);
+  const confirm = await handler.handle({...base,message:{id:'private',flags:64},
+    data:{custom_id:buttons.find(b=>b.label==='모집 취소')!.custom_id!}});
+  await handler.process({...base,id:event(),message:{id:'private',flags:64},
+    data:{custom_id:confirm.components[0]!.components![0]!.custom_id!}});
+  expect(fake.messages.get(r.message_id!)!.content).toContain('[취소됨]');
+  expect(fake.requests.filter(req=>req.path.includes('/webhooks/')).map(req=>req.method)).toEqual(['DELETE']);
+});

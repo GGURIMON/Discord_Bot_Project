@@ -34,6 +34,9 @@ export class Discord {
   edit(channelId: string, messageId: string, payload: MessagePayload) {
     return this.request('PATCH', `/channels/${channelId}/messages/${messageId}`, { ...payload, allowed_mentions: NO_MENTIONS });
   }
+  deleteReply(interaction: Interaction) {
+    return this.request('DELETE', `/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, undefined, false);
+  }
   reply(interaction: Interaction, payload: MessagePayload) {
     return this.request('PATCH', `/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, payload, false);
   }

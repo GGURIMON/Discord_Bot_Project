@@ -14,6 +14,7 @@ function gameRoles(roles: Role[], guildId: string) {
   return roles.filter(role => !role.managed && role.id !== guildId && gameRoleNames.has(shortRoleName(role.name))).slice(0, 25);
 }
 
+const closeCancelledPanel = privateText('모집을 취소했습니다.');
 const resultTexts: Record<string, string> = {
   waiting: '대기 신청했습니다.', already_waiting: '이미 대기 중입니다.', unwaited: '대기를 취소했습니다.', joined: '참가했습니다.', left: '참가를 취소했습니다.', cancelled: '모집을 취소했습니다.',
   already_joined: '이미 참가 중입니다.', not_joined: '참가 중인 모집이 아닙니다.',
@@ -78,6 +79,15 @@ export class Interactions {
         } catch { /* 만료된 패널은 재실행 안내만 표시한다. */ }
       }
     }
+    if (payload === closeCancelledPanel && ((interaction.message?.flags ?? 0) & 64)) {
+      try {
+        await this.discord.deleteReply(interaction);
+        return;
+      } catch (error) {
+        if (error instanceof DiscordError && error.status === 404) return;
+        // 삭제에 실패해도 이미 처리된 버튼은 제거한다.
+      }
+    }
     try { await this.discord.reply(interaction, payload); }
     catch { console.warn(JSON.stringify({ event: 'interaction_reply_failed', interactionId: interaction.id })); }
   }
@@ -139,6 +149,7 @@ export class Interactions {
     const result = await this.repo.act(interaction.id, id, scope, messageId, action as 'join' | 'leave' | 'cancel');
     await this.sync.run(id);
     const pending = await this.repo.db.prepare('SELECT blocked FROM message_jobs WHERE recruitment_id=?').bind(id).first<{ blocked: number }>();
+    if (action === 'cancel' && result === 'cancelled' && !pending) return closeCancelledPanel;
     return privateText(`${resultTexts[result] ?? '처리했습니다.'}${pending ? pending.blocked ? '\n인원은 저장됐지만 메시지 갱신에 문제가 있습니다. 운영자에게 알려 주세요.' : '\n인원은 저장됐으며 메시지 갱신을 재시도하고 있습니다.' : ''}`);
   }
   private async handleDraft(interaction: Interaction, scope: Scope): Promise<MessagePayload> {
