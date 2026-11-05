@@ -18,6 +18,10 @@ Discord 요청 실패는 last_error 및 start_reminder_failed 로그에 남긴�
 
 `npm ci` 후 `npm run check`로 전체 회귀 테스트를 실행한다. `npx vitest run tests/reminders.test.ts`는 로컬 D1에서 주입한 시계를 자정·알림 시점·재시도 시점으로 이동시킨다. Discord 호출도 모의 처리하므로 실제 게임 시작이나 Cron을 기다릴 필요가 없다.
 
+## 테스트 서버 확인 결과
+
+테스트 서버에서 예약 모집의 원본 글에 연결된 스레드로 알림이 전송됐고, Discord에서 메시지가 표시되는 것을 확인했다. Cron은 1분 단위이므로 예약 시각의 정각과 실제 전송 시각에는 차이가 있을 수 있다. 알림을 점검할 때는 먼저 스레드의 메시지를 확인한다. 기기의 푸시 알림이나 소리 수신 여부는 서버의 전송 기록만으로 판별할 수 없다.
+
 ## 배포 전
 
 1. 테스트 D1을 백업하고 기존 마이그레이션 이력을 확인한다. 테스트 환경에 먼저 `npx wrangler d1 migrations apply DB --remote --env staging` 후 같은 커밋의 Worker를 배포한다.
