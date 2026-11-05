@@ -47,10 +47,10 @@ describe('실제 로컬 D1 통합', () => {
     const { r, sync, fake } = await published();
     const results = await Promise.all(Array.from({ length: 20 }, (_, i) => store.repo.act(unique(), r.id, { ...scope, userId: String(700 + i) }, r.message_id!, 'join')));
     expect(results.filter(result => result === 'joined')).toHaveLength(3);
-    expect(results.filter(result => result === 'full')).toHaveLength(17);
+    expect(results.filter(result => result === 'waiting')).toHaveLength(17);
     expect((await store.repo.recruitment(r.id))!.member_count).toBe(4);
     await sync.run(r.id);
-    expect(fake.messages.get(r.message_id!)!.components[0]!.components![0]!.disabled).toBe(true);
+    expect(fake.messages.get(r.message_id!)!.components[0]!.components![0]!.disabled).toBe(false);
     const member = await store.db.prepare('SELECT user_id FROM participants WHERE recruitment_id=? AND user_id!=? LIMIT 1').bind(r.id, scope.userId).first<{ user_id: string }>();
     await store.repo.act(unique(), r.id, { ...scope, userId: member!.user_id }, r.message_id!, 'leave');
     await sync.run(r.id);
@@ -81,7 +81,7 @@ describe('실제 로컬 D1 통합', () => {
   });
   it('정원 1명, DB 직접 삽입도 초과를 차단', async () => {
     const { r, fake } = await published({ maximum: '1' });
-    expect(fake.messages.get(r.message_id!)!.components[0]!.components![0]!.disabled).toBe(true);
+    expect(fake.messages.get(r.message_id!)!.components[0]!.components![0]!.disabled).toBe(false);
     await expect(store.db.prepare('INSERT INTO participants VALUES(?,?,?,?)').bind(unique(), r.id, '999', Date.now()).run()).rejects.toThrow('participant_guard');
   });
   it('작성자 참가 고정, 타인 취소 거부, 작성자 전체 취소', async () => {

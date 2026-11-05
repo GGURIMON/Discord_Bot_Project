@@ -66,7 +66,7 @@ export function validateDraft(data: DraftData, now = Date.now()) {
   return { games, startsAt, endsAt, maximum, roles, timeLabel };
 }
 export function formatContent(ownerId: string, games: Game[], start: number, end: number, count: number, max: number, roles: string[], status = 'open', timeLabel?: string | null): string {
-  const prefix = status === 'cancelled' ? '[취소됨] ' : status === 'ended' ? '[종료됨] ' : '';
+  const prefix = status === 'completed' ? '[완료됨] ' : status === 'cancelled' ? '[취소됨] ' : status === 'ended' ? '[종료됨] ' : '';
   const heading = prefix ? `${prefix}모집자 <@${ownerId}>` : `<@${ownerId}>님이 모집 중에 있습니다.`;
   return `${heading}\n${games.map(game => `${game.name}${game.mode ? `(${game.mode})` : ''}`).join(', ')} / ${timeLabel ?? `${clockTime(start)} ~ ${clockTime(end)}`} / [${count}/${max}]${roles.length ? ` / ${roles.map(id => `<@&${id}>`).join(', ')}` : ''}`;
 }

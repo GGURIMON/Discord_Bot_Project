@@ -46,10 +46,12 @@ export interface DraftData {
   date: string;
 }
 export interface Draft {
+  edit_id?: string | null;
   id: string; guild_id: string; channel_id: string; owner_id: string;
   payload: string; version: number; expires_at: number; consumed_by: string | null;
 }
 export interface Recruitment {
+  completed?: number; creator_id?: string; changes_json?: string;
   time_label?: string | null;
   id: string; guild_id: string; channel_id: string; message_id: string | null;
   owner_id: string; games_json: string; role_ids_json: string;

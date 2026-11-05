@@ -18,7 +18,7 @@ export function draftPanel(draft: Draft, page = 0, notice = '', now = Date.now()
   } catch (error) { problem = error instanceof Error ? error.message : '입력을 확인해 주세요.'; }
   if (draft.consumed_by) return privateText('모집 게시를 접수했습니다. 이 패널은 다시 게시할 수 없습니다.');
   const components = [
-    row(button(`${key}:details:${page}`, '모집 내용 입력', 1), button(`${key}:publish:${page}`, '✅ 모집 게시', 3, Boolean(problem)), button(`${key}:discard:${page}`, '작성 취소', 4)),
+    row(button(`${key}:details:${page}`, '모집 내용 입력', 1), button(`${key}:publish:${page}`, draft.edit_id ? '✅ 수정 저장' : '✅ 모집 게시', 3, Boolean(problem)), button(`${key}:discard:${page}`, '작성 취소', 4)),
   ];
   // 미리보기는 2,000자 제한을 별도로 지키며 게시글에는 전체 내용을 쓴다.
   return { content: `${notice ? `${notice}\n\n` : ''}**모집 작성**\n${preview || problem}`.slice(0, 2000), components, allowed_mentions: NO_MENTIONS };
@@ -42,16 +42,16 @@ export function detailsModal(draft: Draft, page: number, roles: Role[]) {
   ] } };
 }
 export function recruitmentMessage(recruitment: Recruitment, notify = false, now = Date.now()): MessagePayload {
-  const closed = recruitment.status !== 'open' && recruitment.status !== 'publishing' || recruitment.ends_at <= now;
+  const closed = Boolean(recruitment.completed) || recruitment.status !== 'open' && recruitment.status !== 'publishing' || recruitment.ends_at <= now;
   const roles: string[] = JSON.parse(recruitment.role_ids_json);
   return {
-    content: formatContent(recruitment.owner_id, JSON.parse(recruitment.games_json), recruitment.starts_at, recruitment.ends_at, recruitment.member_count, recruitment.max_members, roles, recruitment.status, recruitment.time_label),
+    content: formatContent(recruitment.owner_id, JSON.parse(recruitment.games_json), recruitment.starts_at, recruitment.ends_at, recruitment.member_count, recruitment.max_members, roles, recruitment.completed ? 'completed' : recruitment.status, recruitment.time_label) + (JSON.parse(recruitment.changes_json ?? '[]').length ? '\n변경 내역: ' + JSON.parse(recruitment.changes_json ?? '[]').join(' → ') : ''),
     components: [row(
-      button(`r:${recruitment.id}:join`, '참가하기', 3, closed || recruitment.member_count >= recruitment.max_members),
+      button(`r:${recruitment.id}:join`, '참가하기', 3, closed),
       button(`r:${recruitment.id}:leave`, '참가 취소', 2, closed),
       button(`r:${recruitment.id}:askCancel`, '모집 취소', 4, closed),
       button(`r:${recruitment.id}:members`, '참가자 목록 보기'),
-    )],
+    ), row(button(`r:${recruitment.id}:manage`, '모집 관리', 2, closed), button(`r:${recruitment.id}:transferInbox`, '위임 수락/거절', 2, closed))],
     allowed_mentions: notify ? { parse: [], roles, users: [], replied_user: false } : NO_MENTIONS,
   };
 }

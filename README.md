@@ -120,3 +120,6 @@ DB 상태가 기준이며 Discord API와 원자적 커밋은 불가능하다. �
 2026-11-05 공식 문서 기준 Workers Free 일 100,000 요청/요청 CPU 10ms, D1 Free 일 500만 읽기 행/10만 쓰기 행/합계 5GB다. 테스트는 무료 플랜의 실사용 CPU·요청 한도나 알림 도달을 검증하지 않는다. 실제 사용량을 계측하고 유료 전환은 사전 확인한다. Cron은 1분 간격, 실행당 갱신 작업 5건으로 제한된다. 장기간 모집 이력은 자동 삭제하지 않아 저장량 점검이 필요하다.
 
 공식 문서: [Discord 컴포넌트](https://docs.discord.com/developers/components/reference), [Interaction 응답](https://docs.discord.com/developers/interactions/receiving-and-responding), [D1 batch](https://developers.cloudflare.com/d1/worker-api/d1-database/), [Workers 한도](https://developers.cloudflare.com/workers/platform/limits/), [D1 요금](https://developers.cloudflare.com/d1/platform/pricing/).
+
+
+추가 관리 기능과 배포 전 검증은 [인수인계 보고서](docs/HANDOVER.md)를 먼저 참고하세요. 명령어 등록은 이제 전역 등록이며, 기존 문서의 Guild 등록 설명보다 이 보고서가 우선합니다.

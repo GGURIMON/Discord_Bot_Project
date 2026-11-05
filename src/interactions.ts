@@ -1,3 +1,4 @@
+import { managementUI, seedDraft } from './management-ui';
 import { GAMES } from './config/games';
 import { button, detailsModal, draftPanel, NO_MENTIONS, privateText, row } from './components';
 import { Repository } from './database/repository';
@@ -13,7 +14,7 @@ function gameRoles(roles: Role[], guildId: string) {
 }
 
 const resultTexts: Record<string, string> = {
-  joined: '참가했습니다.', left: '참가를 취소했습니다.', cancelled: '모집을 취소했습니다.',
+  waiting: '대기 신청했습니다.', already_waiting: '이미 대기 중입니다.', unwaited: '대기를 취소했습니다.', joined: '참가했습니다.', left: '참가를 취소했습니다.', cancelled: '모집을 취소했습니다.',
   already_joined: '이미 참가 중입니다.', not_joined: '참가 중인 모집이 아닙니다.',
   full: '정원이 가득 찼습니다.', closed: '취소되었거나 종료된 모집입니다.',
   owner_fixed: '모집자는 기본 참가자로 고정됩니다. 전체 취소는 모집 취소 버튼을 눌러 주세요.',
@@ -74,9 +75,24 @@ export class Interactions {
     const scope = getScope(interaction);
     if (interaction.type === 2) {
       if (interaction.data?.name !== '모집') throw new UserError('지원하지 않는 명령어입니다.');
-      return draftPanel(await this.repo.createDraft(interaction.id, scope));
+      const panel = draftPanel(await this.repo.createDraft(interaction.id, scope));
+      panel.components.push(row(button('recent','내 최근 모집 복사')));
+      return panel;
     }
     const customId = interaction.data?.custom_id ?? '';
+    if (customId === 'recent') {
+      const recent = await this.repo.db.prepare('SELECT id,games_json FROM recruitments WHERE guild_id=? AND creator_id=? ORDER BY created_at DESC,id DESC LIMIT 5').bind(scope.guildId,scope.userId).all<{id:string;games_json:string}>();
+      if (!recent.results.length) return privateText('복사할 모집이 없습니다.');
+      return {...privateText('복사할 모집을 선택해 주세요. 시간은 새로 입력해야 합니다.'),components:[row({type:3,custom_id:'copy',options:recent.results.map((r,i)=>({label:`${i+1}. ${JSON.parse(r.games_json).map((g:{name:string})=>g.name).join(', ')}`.slice(0,100),value:r.id}))})]};
+    }
+    if (customId === 'copy') {
+      const r = await this.repo.recruitment(interaction.data?.values?.[0] ?? '');
+      const allowed = await this.repo.db.prepare('SELECT id FROM recruitments WHERE guild_id=? AND creator_id=? ORDER BY created_at DESC,id DESC LIMIT 5').bind(scope.guildId,scope.userId).all<{id:string}>();
+      if (!r || !allowed.results.some(x=>x.id===r.id)) throw new UserError('복사할 수 없는 모집입니다.');
+      return seedDraft(this.repo,interaction.id,scope,r,false);
+    }
+    const managed = await managementUI(this.repo,interaction,scope);
+    if (managed) { const id = customId.split(':')[1]; if (id) await this.sync.run(id); return managed; }
     if (customId.startsWith('d:')) return this.handleDraft(interaction, scope);
     if (customId === 'dismiss') return privateText('모집 취소를 중단했습니다.');
     const [prefix, id, action, sourceMessage, pageText] = customId.split(':');
@@ -84,12 +100,13 @@ export class Interactions {
       const messageId = action === 'members' ? interaction.message?.id : sourceMessage;
       if (!messageId) throw new UserError('모집 메시지를 확인할 수 없습니다.');
       const members = await this.repo.participants(id, scope, messageId);
-      const pageSize = 50;
-      const pages = Math.ceil(members.length / pageSize);
+      const waiting = await this.repo.db.prepare('SELECT user_id FROM waiting WHERE recruitment_id=? AND promoted=0 ORDER BY sequence').bind(id).all<{user_id:string}>();
+      const allLines = [...members.map(member => `<@${member.user_id}>${member.user_id === member.owner_id ? ' (모집자)' : ''}`), ...(waiting.results.length ? [`대기자 목록 · ${waiting.results.length}명`, ...waiting.results.map((u,i)=>`${i+1}. <@${u.user_id}>`)] : [])];
+      const pageSize = 40;
+      const pages = Math.ceil(allLines.length / pageSize);
       const requested = Number(pageText ?? 0);
       const page = Number.isSafeInteger(requested) ? Math.max(0, Math.min(requested, pages - 1)) : 0;
-      const lines = members.slice(page * pageSize, (page + 1) * pageSize)
-        .map(member => `<@${member.user_id}>${member.user_id === member.owner_id ? ' (모집자)' : ''}`);
+      const lines = allLines.slice(page * pageSize, (page + 1) * pageSize);
       const panel = privateText([`참가자 목록 · ${members.length}명`, ...lines].join('\n'));
       if (pages > 1) {
         const key = `r:${id}:membersPage:${messageId}`;
@@ -176,6 +193,7 @@ export class Interactions {
       // 검증 실패한 입력도 보존해 다음 Modal에서 바로 수정할 수 있게 한다.
     } else if (parsed.action === 'publish') {
       validateDraft(data);
+      if (draft.edit_id) { await this.repo.editDraft(draft,data,scope); await this.sync.run(draft.edit_id); return privateText('기존 모집글을 수정했습니다.'); }
       const recruitment = await this.repo.publishDraft(draft, data);
       await this.sync.run(recruitment.id);
       const latest = await this.repo.recruitment(recruitment.id);

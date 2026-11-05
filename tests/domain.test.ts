@@ -50,7 +50,7 @@ describe('모집 입력과 일반 메시지', () => {
     const v = validateDraft(data(), now);
     const r = { id: '123', games_json: JSON.stringify(v.games), role_ids_json: '["400"]', starts_at: v.startsAt, ends_at: v.endsAt, max_members: 4, member_count: 4, status: 'open' } as Recruitment;
     const full = recruitmentMessage(r, false, now);
-    expect(full.components[0]!.components![0]!.disabled).toBe(true);
+    expect(full.components[0]!.components![0]!.disabled).toBe(false);
     expect(full.components[0]!.components![1]!.disabled).toBe(false);
     expect(full.allowed_mentions).toMatchObject({ parse: [], roles: [], users: [] });
     expect(recruitmentMessage({ ...r, member_count: 3 }, false, now).components[0]!.components![0]!.disabled).toBe(false);
