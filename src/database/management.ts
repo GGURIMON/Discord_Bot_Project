@@ -43,5 +43,7 @@ export async function manage(repo: Repository, event: string, id: string, scope:
   if (action === 'accept' || action === 'reject') statements.push(p(`UPDATE transfers SET state=? WHERE id=? AND ${guard}`).bind(action,target));
   statements.push(p('SELECT result FROM interaction_receipts WHERE interaction_id=?').bind(event));
   const results = await repo.db.batch(statements);
-  return (results.at(-1)!.results[0] as {result:string}).result;
+  const result = (results.at(-1)!.results[0] as {result:string}).result;
+  if (action === 'offer' && result === 'managed' && !results[0]!.meta.changes) return 'offer_replayed';
+  return result;
 }

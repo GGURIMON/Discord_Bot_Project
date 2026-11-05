@@ -153,3 +153,19 @@ it('권한 위임은 참가자의 서버 닉네임을 표시하고 ID로 정확�
     data:{custom_id:`m:${r.id}:chooseOffer:${r.message_id}`}});
   expect(panel.components[0]!.components![0]!.options).toEqual([{label:'1. 서버별명',value:'301'}]);
 });
+
+it.each([false,true])('위임 알림은 수신자만 멘션하고 재전송하지 않는다 (DM 차단 %s)',async(blocked)=>{
+  const {r,act,fake}=await setup(); await act('301','join');
+  const handler=new Interactions(store.repo,fake.client());
+  const request={id:event(),application_id:'999',token:'test',type:3,guild_id:scope.guildId,
+    channel_id:scope.channelId,member:{user:{id:scope.userId}},message:{id:'private',flags:64},
+    data:{custom_id:`m:${r.id}:offer:${r.message_id}:301`}};
+  if(blocked) fake.nextStatus=403;
+  const reply=await handler.handle(request);
+  expect(reply.content).toContain(blocked?'전달을 확인하지 못했습니다':'개인 메시지를 보냈습니다');
+  await handler.handle(request);
+  expect(fake.requests.filter(q=>q.path.endsWith('/users/@me/channels')).map(q=>q.body)).toEqual([{recipient_id:'301'}]);
+  if(!blocked) expect(fake.requests.find(q=>q.path.endsWith('/channels/999/messages'))?.body).toMatchObject({
+    allowed_mentions:{users:['301'],parse:[]},content:expect.stringContaining('<@301>')});
+  expect(await store.db.prepare('SELECT state FROM transfers WHERE id=?').bind(request.id).first('state')).toBe('pending');
+});

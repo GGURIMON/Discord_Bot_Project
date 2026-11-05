@@ -65,5 +65,14 @@ export async function managementUI(repo: Repository, discord: Discord, interacti
   }
   if (!['promote','restore','offer','complete','accept','reject'].includes(action!)) throw new UserError('잘못된 관리 요청입니다.');
   const result = await manage(repo,interaction.id,id,scope,msg,action!,target);
-  return privateText(result === 'managed' ? action==='offer' ? '위임을 요청했습니다. 대상자가 15분 안에 모집글 설정의 ‘위임 응답’에서 수락하면 권한이 이전됩니다.' : '변경했습니다.' : '권한이나 명단이 변경됐거나 빈자리가 없습니다. 최신 상태에서 다시 시도해 주세요.');
+  if (result === 'offer_replayed') return privateText('이미 접수된 위임 요청입니다.');
+  if (action === 'offer' && result === 'managed' && target) {
+    try {
+      await discord.notifyTransfer(target,interaction.id,`https://discord.com/channels/${scope.guildId}/${scope.channelId}/${msg}`);
+      return privateText('위임 요청을 등록하고 대상자에게 개인 메시지를 보냈습니다.');
+    } catch {
+      return privateText('위임 요청은 등록됐지만 개인 메시지 전달을 확인하지 못했습니다. 대상자는 모집글 설정의 ‘위임 응답’에서 확인할 수 있습니다.');
+    }
+  }
+  return privateText(result === 'managed' ? '변경했습니다.' : '권한이나 명단이 변경됐거나 빈자리가 없습니다. 최신 상태에서 다시 시도해 주세요.');
 }
