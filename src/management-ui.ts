@@ -1,3 +1,4 @@
+import type { Discord } from './services/discord';
 import { button, row, privateText } from './components';
 import { manage, scoped } from './database/management';
 import { Repository } from './database/repository';
@@ -15,9 +16,9 @@ export async function seedDraft(repo: Repository, event: string, scope: Scope, r
   await repo.db.prepare('UPDATE drafts SET edit_id=? WHERE id=?').bind(edit ? r.id : null,draft.id).run();
   return {...await repo.saveDraft(draft,data),edit_id:edit ? r.id : null};
 }
-export async function managementUI(repo: Repository, interaction: Interaction, scope: Scope) {
+export async function managementUI(repo: Repository, discord: Discord, interaction: Interaction, scope: Scope) {
   const [prefix,id,action,message,target] = (interaction.data?.custom_id ?? '').split(':');
-  if (prefix !== 'm' && !(prefix === 'r' && ['manage','transferInbox'].includes(action!))) return null;
+  if (prefix !== 'm' && !(prefix === 'r' && ['manage','transferInbox','askComplete'].includes(action!))) return null;
   const msg = prefix === 'r' ? interaction.message?.id : message;
   if (!id || !msg) throw new UserError('모집 메시지가 없습니다.');
   const ownerAction = !['transferInbox','accept','reject'].includes(action!);
@@ -40,9 +41,20 @@ export async function managementUI(repo: Repository, interaction: Interaction, s
     const page = Math.max(0,Number(target)||0);
     const sql = kind === 'offer' ? 'SELECT user_id FROM participants WHERE recruitment_id=? AND user_id!=? ORDER BY joined_at,user_id'
       : `SELECT user_id FROM waiting WHERE recruitment_id=? AND user_id!=? AND promoted=${kind==='restore'?1:0} ORDER BY sequence`;
-    const users = await repo.db.prepare(sql+' LIMIT 26 OFFSET ?').bind(id,r.owner_id,page*25).all<{user_id:string}>();
+    const pageSize = 10;
+    const users = await repo.db.prepare(sql+' LIMIT 11 OFFSET ?').bind(id,r.owner_id,page*pageSize).all<{user_id:string}>();
     if (!users.results.length) return privateText('선택할 사용자가 없습니다.');
-    return {...privateText('대상 선택 후 확인 버튼을 눌러 주세요.'),components:[row({type:3,custom_id:`${key}:ask${kind}:${msg}`,options:users.results.slice(0,25).map((u,i)=>({label:`${page*25+i+1}. ${u.user_id}`,value:u.user_id}))}),row(button(`${key}:${action}:${msg}:${page-1}`,'이전',2,page===0),button(`${key}:${action}:${msg}:${page+1}`,'다음',2,users.results.length<=25))]};
+    const candidates = users.results.slice(0,pageSize);
+    const options = await Promise.all(candidates.map(async (user,i) => {
+      const name = await discord.memberDisplayName(scope.guildId,user.user_id).catch(()=>null);
+      const number = page*pageSize+i+1;
+      return {label:`${number}. ${name || '아래 명단에서 확인'}`,value:user.user_id};
+    }));
+    const roster = candidates.map((user,i)=>`${page*pageSize+i+1}. <@${user.user_id}>`).join('\n');
+    return {...privateText(`대상을 선택해 주세요.\n${roster}`),components:[
+      row({type:3,custom_id:`${key}:ask${kind}:${msg}`,options}),
+      row(button(`${key}:${action}:${msg}:${page-1}`,'이전',2,page===0),
+          button(`${key}:${action}:${msg}:${page+1}`,'다음',2,users.results.length<=pageSize))]};
   }
   if (action?.startsWith('ask')) {
     const user = interaction.data?.values?.[0];

@@ -27,6 +27,11 @@ export class Discord {
     if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
   }
+  async memberDisplayName(guildId: string, userId: string) {
+    const member = await this.request<{nick?:string|null; user:{global_name?:string|null;username:string}}>(
+      'GET', `/guilds/${guildId}/members/${userId}`);
+    return member.nick || member.user.global_name || member.user.username;
+  }
   roles(guildId: string) { return this.request<Role[]>('GET', `/guilds/${guildId}/roles`); }
   create(channelId: string, id: string, payload: MessagePayload) {
     return this.request<{ id: string }>('POST', `/channels/${channelId}/messages`, { ...payload, nonce: id, enforce_nonce: true });

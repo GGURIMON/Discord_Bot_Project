@@ -91,7 +91,7 @@ describe('실제 로컬 D1 통합', () => {
     expect(await store.repo.act(unique(), r.id, scope, r.message_id!, 'cancel')).toBe('cancelled');
     await sync.run(r.id);
     const body = fake.messages.get(r.message_id!)!;
-    expect(body.components[0]!.components![3]!.disabled).toBe(false);
+    expect(body.components[0]!.components![3]!.disabled).toBe(true);
     expect(body.content).toMatch(/^\[취소됨\]/);
     expect(body.components[0]!.components!.slice(0, 3).every(button => button.disabled)).toBe(true);
     expect(await store.repo.act(unique(), r.id, { ...scope, userId: '301' }, r.message_id!, 'join')).toBe('closed');

@@ -24,8 +24,9 @@ export default {
     const menu = /^r:(\d+):menu$/.exec(interaction.data?.custom_id ?? '');
     if (interaction.type === 3 && menu && interaction.data) {
       const selected = interaction.data.values?.[0];
-      if (!interaction.message?.id || !managementOptions.some(([value])=>value===selected)) return Response.json(errorResponse('올바르지 않은 선택입니다.'));
-      interaction.data.custom_id = `m:${menu[1]}:${selected}:${interaction.message.id}`;
+      if (!interaction.message?.id || !(managementOptions.some(([value])=>value===selected) || selected==='askComplete')) return Response.json(errorResponse('올바르지 않은 선택입니다.'));
+      interaction.data.custom_id = selected === 'members' || selected === 'transferInbox'
+        ? `r:${menu[1]}:${selected}` : `m:${menu[1]}:${selected}:${interaction.message.id}`;
     }
     const handler = new Interactions(new Repository(env.DB), new Discord(env.DISCORD_BOT_TOKEN));
     if (interaction.type === 3 && /^(?:d:\d+:\d+:details:|r:\d+:edit$|m:\d+:edit:\d+$)/.test(interaction.data?.custom_id ?? '')) {

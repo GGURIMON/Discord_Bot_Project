@@ -124,19 +124,32 @@ it('원본이 만원이고 대기가 있어도 복사 게시 후 새 명단에�
   expect(await roster(r.id,r.message_id!)).toContain('대기자 목록 · 1명\n1. <@302>');
 });
 
-it('명단 옆 취소 버튼에서 취소를 확인하면 원본을 갱신하고 개인 확인창을 삭제한다', async () => {
+it('모집글 취소 버튼에서 취소를 확인하면 원본을 갱신하고 개인 확인창을 삭제한다', async () => {
   const {r,fake} = await setup();
   const handler = new Interactions(store.repo,fake.client());
   const base = {id:event(),application_id:'999',token:'test',type:3,guild_id:scope.guildId,
     channel_id:scope.channelId,member:{user:{id:scope.userId}},message:{id:r.message_id!,flags:0}};
   const buttons = fake.messages.get(r.message_id!)!.components[0]!.components!;
-  const index = buttons.findIndex(button => button.label === '참가자·대기자 목록');
-  expect(index).toBeGreaterThanOrEqual(0);
-  const cancel = buttons[index + 1]!;
+  expect(buttons.map(b=>b.label)).toEqual(['참가하기','참가 취소','모집 완료','모집 취소']);
+  const cancel = buttons[3]!;
   expect(cancel.label).toBe('모집 취소');
   const confirm = await handler.handle({...base,data:{custom_id:cancel.custom_id!}});
   await handler.process({...base,id:event(),message:{id:'private',flags:64},
     data:{custom_id:confirm.components[0]!.components![0]!.custom_id!}});
   expect(fake.messages.get(r.message_id!)!.content).toContain('[취소됨]');
   expect(fake.requests.filter(req=>req.path.includes('/webhooks/')).map(req=>req.method)).toEqual(['DELETE']);
+});
+
+it('권한 위임은 참가자의 서버 닉네임을 표시하고 ID로 정확한 대상을 선택한다',async()=>{
+  const {r,act,fake}=await setup();
+  await act('301','join');
+  const http=fake.fetch;
+  fake.fetch=async(url,init)=>url.endsWith('/members/301')
+    ? Response.json({nick:'서버별명',user:{username:'username',global_name:'표시이름'}})
+    : http(url,init);
+  const handler=new Interactions(store.repo,fake.client());
+  const panel=await handler.handle({id:event(),application_id:'999',token:'test',type:3,guild_id:scope.guildId,
+    channel_id:scope.channelId,member:{user:{id:scope.userId}},message:{id:r.message_id!},
+    data:{custom_id:`m:${r.id}:chooseOffer:${r.message_id}`}});
+  expect(panel.components[0]!.components![0]!.options).toEqual([{label:'1. 서버별명',value:'301'}]);
 });

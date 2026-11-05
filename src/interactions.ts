@@ -122,7 +122,7 @@ export class Interactions {
       if (!r || !allowed.results.some(x=>x.id===r.id)) throw new UserError('복사할 수 없는 모집입니다.');
       return draftPanel(await seedDraft(this.repo,interaction.id,scope,r,false),0,'이전 모집을 복사했습니다. 시간과 내용을 확인한 뒤 게시해 주세요.');
     }
-    const managed = await managementUI(this.repo,interaction,scope);
+    const managed = await managementUI(this.repo,this.discord,interaction,scope);
     if (managed) { const id = customId.split(':')[1]; if (id) await this.sync.run(id); return managed; }
     if (customId.startsWith('d:')) return this.handleDraft(interaction, scope);
     if (customId === 'dismiss') return privateText('모집 취소를 중단했습니다.');
