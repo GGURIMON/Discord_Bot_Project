@@ -120,7 +120,7 @@ it('원본이 만원이고 대기가 있어도 복사 게시 후 새 명단에�
   const copy = (await store.repo.recruitment(id))!;
   const roster = async (rid:string, mid:string) => (await handler.handle({...base,id:event(),
     message:{id:mid},data:{custom_id:`r:${rid}:members`}})).content;
-  expect(await roster(id,copy.message_id!)).toBe(`참가자 목록 · 1명\n<@${scope.userId}> (모집자)\n대기자 목록 · 0명`);
+  expect(await roster(id,copy.message_id!)).toBe(`참가자 목록 · 1명\n<@${scope.userId}> (모집자)\n\n대기자 목록 · 0명`);
   expect(await roster(r.id,r.message_id!)).toContain('대기자 목록 · 1명\n1. <@302>');
 });
 
