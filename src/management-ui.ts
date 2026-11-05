@@ -28,7 +28,7 @@ export async function managementUI(repo: Repository, interaction: Interaction, s
     button(`${key}:choosePromote:${msg}`,'대기자 참가 전환'),button(`${key}:chooseRestore:${msg}`,'참가 전환 복원'),
     button(`${key}:chooseOffer:${msg}`,'권한 위임'),button(`${key}:askComplete:${msg}`,'모집 완료'),button(`${key}:askCancel:${msg}`,'모집 취소',4))]};
 
-  if (action === 'askCancel') return {...privateText('모집을 취소하시겠습니까?'),components:[row(button(`r:${id}:cancel:${msg}`,'모집 취소 확인',4),button(`${key}:manage:${msg}`,'돌아가기'))]};
+  if (action === 'askCancel') return {...privateText('모집을 취소하시겠습니까?'),components:[row(button(`r:${id}:cancel:${msg}`,'모집 취소 확인',4),button('dismiss','돌아가기'))]};
   if (action === 'askComplete') return {...privateText('모집 완료 하시겠습니까?'),components:[row(button(`${key}:complete:${msg}`,'완료 확인',3),button('dismiss','돌아가기'))]};
   if (action === 'transferInbox') {
     const pending = await repo.db.prepare("SELECT id FROM transfers WHERE recruitment_id=? AND from_user=? AND to_user=? AND state='pending' AND expires_at>? ORDER BY expires_at DESC LIMIT 1").bind(id,r.owner_id,scope.userId,Date.now()).first<{id:string}>();

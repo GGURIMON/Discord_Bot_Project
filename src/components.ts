@@ -52,9 +52,12 @@ export function recruitmentMessage(recruitment: Recruitment, notify = false, now
     components: [row(
       button(`r:${recruitment.id}:join`, '참가하기', 3, closed),
       button(`r:${recruitment.id}:leave`, '참가 취소', 2, closed),
-      button(`r:${recruitment.id}:manage`, '모집 관리', 2, closed),
+      button(`r:${recruitment.id}:transferInbox`, '위임 응답', 2, closed),
       button(`r:${recruitment.id}:members`, '참가자·대기자 목록'),
-    ), row(button(`r:${recruitment.id}:edit`, '내용 수정', 2, closed), button(`r:${recruitment.id}:transferInbox`, '위임 수락/거절', 2, closed))],
+    ), row({type:3,custom_id:`r:${recruitment.id}:menu`,placeholder:'모집 관리',disabled:closed,
+      options: managementOptions.map(([value,label])=>({value,label}))})],
     allowed_mentions: notify ? { parse: [], roles, users: [], replied_user: false } : NO_MENTIONS,
   };
 }
+
+export const managementOptions = [['edit','내용 수정'],['choosePromote','대기자 참가 전환'],['chooseRestore','참가 전환 복원'],['chooseOffer','권한 위임'],['askComplete','모집 완료'],['askCancel','모집 취소']] as const;

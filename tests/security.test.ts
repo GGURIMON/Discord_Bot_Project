@@ -67,3 +67,14 @@ it.each([
     expect(await response.json()).toEqual(type === 6 ? { type: 6 } : { type: 5, data: { flags: 64 } });
   } finally { mock.mockRestore(); }
 });
+it('공개 모집 관리 드롭다운에서 선택한 작업을 원본 메시지에 연결한다', async () => {
+  const process = vi.spyOn(Interactions.prototype,'process').mockResolvedValue();
+  try {
+    const body = {type:3,id:'900',application_id:'123',token:'x',guild_id:'1',channel_id:'2',
+      member:{user:{id:'3'}},message:{id:'4',flags:0},data:{custom_id:'r:5:menu',values:['askComplete']}};
+    const response = await worker.fetch(await signed(JSON.stringify(body)),
+      {DISCORD_PUBLIC_KEY:publicKey,DISCORD_APPLICATION_ID:'123'} as Env,{waitUntil(){}} as unknown as ExecutionContext);
+    expect(await response.json()).toEqual({type:5,data:{flags:64}});
+    expect(process.mock.calls[0]?.[0].data?.custom_id).toBe('m:5:askComplete:4');
+  } finally { process.mockRestore(); }
+});

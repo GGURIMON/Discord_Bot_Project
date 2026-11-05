@@ -14,6 +14,7 @@ function gameRoles(roles: Role[], guildId: string) {
   return roles.filter(role => !role.managed && role.id !== guildId && gameRoleNames.has(shortRoleName(role.name))).slice(0, 25);
 }
 
+const editSaved = privateText('모집글에 수정을 반영했습니다.');
 const closeCancelledPanel = privateText('모집을 취소했습니다.');
 const resultTexts: Record<string, string> = {
   waiting: '대기 신청했습니다.', already_waiting: '이미 대기 중입니다.', unwaited: '대기를 취소했습니다.', joined: '참가했습니다.', left: '참가를 취소했습니다.', cancelled: '모집을 취소했습니다.',
@@ -79,7 +80,17 @@ export class Interactions {
         } catch { /* 만료된 패널은 재실행 안내만 표시한다. */ }
       }
     }
-    if (payload === closeCancelledPanel && ((interaction.message?.flags ?? 0) & 64)) {
+    // 공개 글에서 시작한 작업은 type 5 개인 응답, 개인 패널 안의 작업은 type 6으로 갱신한다.
+    const actionId = interaction.data?.custom_id ?? '';
+    const terminalManagement = !payload.components.length && (actionId.startsWith('m:') ||
+      actionId.endsWith(':transferInbox') || actionId === 'dismiss' || payload === editSaved);
+    if (terminalManagement && payload !== editSaved && actionId !== 'dismiss') {
+      try {
+        await this.discord.reply(interaction,payload);
+        await new Promise(resolve=>setTimeout(resolve,3500));
+      } catch { return; }
+    }
+    if (terminalManagement || (payload === closeCancelledPanel && ((interaction.message?.flags ?? 0) & 64))) {
       try {
         await this.discord.deleteReply(interaction);
         return;
@@ -223,7 +234,7 @@ export class Interactions {
     if (draft.edit_id && interaction.type === 5) {
       await this.repo.editDraft(draft,data,scope);
       await this.sync.run(draft.edit_id);
-      return privateText('모집글에 수정을 반영했습니다.');
+      return editSaved;
     }
     draft = await this.repo.saveDraft(draft, data);
     return draftPanel(draft, parsed.page);
