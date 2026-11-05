@@ -154,7 +154,7 @@ export class Interactions {
       const current = await this.repo.recruitment(id);
       if (!current || current.guild_id !== scope.guildId || current.channel_id !== scope.channelId || current.message_id !== messageId) throw new UserError('사용할 수 없는 모집입니다.');
       if (current.owner_id !== scope.userId) throw new UserError('모집자만 모집을 취소할 수 있습니다.');
-      if (current.status !== 'open' || current.ends_at <= Date.now()) throw new UserError('이미 취소되었거나 종료된 모집입니다.');
+      if (current.completed || current.status !== 'open' || current.ends_at <= Date.now()) throw new UserError('이미 취소되었거나 종료된 모집입니다.');
       return { ...privateText('모집을 취소할까요?'), components: [row(button(`r:${id}:cancel:${messageId}`, '모집 취소 확인', 4), button('dismiss', '돌아가기'))] };
     }
     const result = await this.repo.act(interaction.id, id, scope, messageId, action as 'join' | 'leave' | 'cancel');
