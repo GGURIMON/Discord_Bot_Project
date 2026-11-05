@@ -34,7 +34,7 @@ export async function managementUI(repo: Repository, discord: Discord, interacti
   if (action === 'transferInbox') {
     const pending = await repo.db.prepare("SELECT id FROM transfers WHERE recruitment_id=? AND from_user=? AND to_user=? AND state='pending' AND expires_at>? ORDER BY expires_at DESC LIMIT 1").bind(id,r.owner_id,scope.userId,Date.now()).first<{id:string}>();
     if (!pending) return privateText('받은 위임 요청이 없습니다.');
-    return {...privateText('모집자 권한 위임을 수락할까?'),components:[row(button(`${key}:accept:${msg}:${pending.id}`,'수락',3),button(`${key}:reject:${msg}:${pending.id}`,'거절',4))]};
+    return {...privateText('모집자 권한 위임을 수락하시겠습니까?'),components:[row(button(`${key}:accept:${msg}:${pending.id}`,'수락',3),button(`${key}:reject:${msg}:${pending.id}`,'거절',4))]};
   }
   if (action?.startsWith('choose')) {
     const kind = action.slice(6).toLowerCase();
@@ -59,9 +59,11 @@ export async function managementUI(repo: Repository, discord: Discord, interacti
   if (action?.startsWith('ask')) {
     const user = interaction.data?.values?.[0];
     if (!user || !/^\d+$/.test(user)) throw new UserError('대상을 선택해 주세요.');
-    return {...privateText(`<@${user}> 대상으로 진행할까?`),components:[row(button(`${key}:${action.slice(3)}:${msg}:${user}`,'확인',3),button('dismiss','돌아가기'))]};
+    const question = action === 'askoffer' ? '권한을 위임하시겠습니까?'
+      : action === 'askrestore' ? '대기자로 복원하시겠습니까?' : '참가자로 전환하시겠습니까?';
+    return {...privateText(`대상: <@${user}>\n${question}`),components:[row(button(`${key}:${action.slice(3)}:${msg}:${user}`,'확인',3),button('dismiss','돌아가기'))]};
   }
   if (!['promote','restore','offer','complete','accept','reject'].includes(action!)) throw new UserError('잘못된 관리 요청입니다.');
   const result = await manage(repo,interaction.id,id,scope,msg,action!,target);
-  return privateText(result === 'managed' ? action==='offer' ? '위임 요청을 저장했습니다. 대상자가 모집글의 위임 수락/거절 버튼에서 수락해야 해요. (15분 유효)' : '변경했습니다.' : '권한이나 명단이 변경됐거나 빈자리가 없습니다. 최신 상태에서 다시 시도해 주세요.');
+  return privateText(result === 'managed' ? action==='offer' ? '위임을 요청했습니다. 대상자가 15분 안에 모집글 설정의 ‘위임 응답’에서 수락하면 권한이 이전됩니다.' : '변경했습니다.' : '권한이나 명단이 변경됐거나 빈자리가 없습니다. 최신 상태에서 다시 시도해 주세요.');
 }
