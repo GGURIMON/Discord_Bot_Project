@@ -39,7 +39,7 @@ export function gamesOf(data: DraftData): Game[] {
   if (games.length > 25) throw new UserError('한 모집에는 최대 25개 게임을 입력할 수 있습니다.');
   return games;
 }
-export function validateDraft(data: DraftData, now = Date.now()) {
+export function validateDraft(data: DraftData, now = Date.now(), retainedStart?: number) {
   if (data.roleError) throw new UserError(data.roleError);
   const games = gamesOf(data);
   const timeLabel = (data.timeText ?? [data.start, data.end].filter(Boolean).join(' ~ ')).trim();
@@ -47,11 +47,13 @@ export function validateDraft(data: DraftData, now = Date.now()) {
   const immediate = ['지금', '지금부터'].includes(timeLabel);
   if (!immediate && !times) throw new UserError('시간은 지금, HH:mm 또는 HH:mm ~ HH:mm으로 입력해 주세요.');
   if (!/^[1-9]\d{0,2}$/.test(data.maximum)) throw new UserError('최대 인원은 1~999 사이의 정수로 입력해 주세요.');
-  const onDate = (hour: string, minute: string) => Date.parse(`${data.date}T${hour}:${minute}:00+09:00`);
-  const startsAt = times ? onDate(times[1]!, times[2]!) : now;
+  const onDate = (hour: string, minute: string) => Date.parse(`${seoulDate(now)}T${hour}:${minute}:00+09:00`);
+  let startsAt = times ? onDate(times[1]!, times[2]!) : now;
+  if (times && startsAt < now) startsAt += 86400000;
+  if (retainedStart !== undefined) startsAt = retainedStart;
   let endsAt = startsAt + 86400000;
   if (times?.[3]) {
-    endsAt = onDate(times[3], times[4]!);
+    endsAt = Date.parse(`${seoulDate(startsAt)}T${times[3]}:${times[4]}:00+09:00`);
     if (endsAt === startsAt) throw new UserError('시작과 종료 시간은 달라야 합니다.');
     if (endsAt < startsAt) endsAt += 86400000;
   }

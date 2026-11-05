@@ -89,11 +89,13 @@ export class Repository {
     return (results[4]!.results[0] as { result: string }).result;
   }
   async editDraft(draft: Draft, data: DraftData, scope: Scope) {
-    const v = validateDraft(data);
     const now = Date.now();
     const claim = crypto.randomUUID();
     const r = await this.recruitment(draft.edit_id!);
     if (!r) throw new UserError('모집을 찾을 수 없습니다.');
+    const label = (data.timeText ?? [data.start,data.end].filter(Boolean).join(' ~ ')).trim();
+    const sameStart = label.split(/\s*[~–-]\s*/)[0] === r.time_label?.split(/\s*[~–-]\s*/)[0];
+    const v = validateDraft(data,now,sameStart ? r.starts_at : undefined);
     const result = await this.db.batch([
       this.db.prepare(`UPDATE drafts SET consumed_by=?,version=version+1 WHERE id=? AND version=? AND consumed_by IS NULL AND expires_at>?
         AND EXISTS(SELECT 1 FROM recruitments r WHERE r.id=drafts.edit_id AND r.guild_id=? AND r.channel_id=? AND r.owner_id=? AND r.status='open' AND r.completed=0 AND r.ends_at>? AND r.version=? AND (SELECT COUNT(*) FROM participants WHERE recruitment_id=r.id)<=?)`)

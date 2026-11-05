@@ -15,6 +15,7 @@ export async function database() {
   await db.exec(sql.split('\n').filter(line => !line.trim().startsWith('--')).join(' '));
   await db.exec(await readFile(new NodeURL('../migrations/0002_time_label.sql', import.meta.url), 'utf8'));
   await db.exec((await readFile(new NodeURL('../migrations/0003_management.sql', import.meta.url), 'utf8')).split('\n').filter(line => !line.trim().startsWith('--')).join(' '));
+  await db.exec((await readFile(new NodeURL('../migrations/0004_start_reminders.sql', import.meta.url), 'utf8')).split('\n').join(' '));
   return { mf, repo: new Repository(db), db };
 }
 export function validData(overrides: Partial<DraftData> = {}): DraftData {
