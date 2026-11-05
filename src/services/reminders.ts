@@ -3,7 +3,7 @@ import { clockTime } from '../domain';
 import { Discord, DiscordError } from './discord';
 
 const minute = 60_000;
-const windowMs = 5 * minute;
+const reminderLead = 10 * minute;
 // A Discord message allows 2000 characters and at most 100 explicitly allowed users.
 const pageSize = 75;
 type Job = {
@@ -19,10 +19,10 @@ export class StartReminders {
   async drain() {
     const now = this.clock();
     const jobs = await this.db.prepare(`SELECT j.recruitment_id FROM start_reminders j JOIN recruitments r ON r.id=j.recruitment_id
-      WHERE j.blocked=0 AND j.sent_at IS NULL AND j.next_at BETWEEN ? AND ? AND j.due_at>=?
+      WHERE j.blocked=0 AND j.sent_at IS NULL AND j.next_at BETWEEN ? AND ? AND j.due_at>?
       AND j.lease_until<=? AND r.status='open' AND r.starts_at=j.due_at+600000 AND r.ends_at>?
-      AND r.message_id IS NOT NULL ORDER BY j.next_at LIMIT 2`)
-      .bind(now-windowMs,now,now-windowMs,now,now).all<{recruitment_id:string}>();
+      AND r.message_id IS NOT NULL ORDER BY j.next_at,j.recruitment_id LIMIT 2`)
+      .bind(now-reminderLead,now,now-reminderLead,now,now).all<{recruitment_id:string}>();
     for (const candidate of jobs.results) {
       try { await this.run(candidate.recruitment_id); }
       catch { console.warn('reminder_db_error',candidate.recruitment_id); }
@@ -34,8 +34,8 @@ export class StartReminders {
     const claim = crypto.randomUUID();
     const job = await this.db.prepare(`UPDATE start_reminders SET claim=?,lease_until=?
       WHERE recruitment_id=? AND sent_at IS NULL AND blocked=0 AND next_at<=? AND lease_until<=?
-      AND due_at BETWEEN ? AND ? RETURNING *`)
-      .bind(claim,now+45_000,id,now,now,now-windowMs,now).first<Job>();
+      AND due_at>? AND due_at<=? RETURNING *`)
+      .bind(claim,now+45_000,id,now,now,now-reminderLead,now).first<Job>();
     if (!job) return;
     const source = () => this.db.prepare(`SELECT r.guild_id,r.channel_id,r.message_id,r.games_json,r.starts_at
       FROM recruitments r JOIN start_reminders j ON j.recruitment_id=r.id WHERE r.id=? AND j.claim=?
@@ -71,7 +71,10 @@ export class StartReminders {
         const marked = await this.db.prepare(`UPDATE start_reminders SET first_send_at=coalesce(first_send_at,?),lease_until=?
           WHERE recruitment_id=? AND claim=?`).bind(this.clock(),this.clock()+45_000,id,claim).run();
         if (!marked.meta.changes) return;
-        const title = start===0 ? `🎮 ${game.slice(0,110)} — 시작 10분 전입니다!\n게임 시작 예정: ${clockTime(r.starts_at)}\n\n` : '';
+        const remainingMs = r.starts_at-this.clock();
+        if (remainingMs<=0) return;
+        const remaining = remainingMs<minute ? '시작까지 1분 미만입니다' : `시작 ${Math.ceil(remainingMs/minute)}분 전입니다`;
+        const title = start===0 ? `🎮 ${game.slice(0,110)} — ${remaining}!\n게임 시작 예정: ${clockTime(r.starts_at)}\n\n` : '';
         const mentions = chunk.map(user=>`<@${user}>`).join(' ');
         await this.discord.create(job.thread_id,`${id}-${start}`,{
           content:`${title}참가자 알림\n${mentions}\n게임 시작 준비를 해주세요!`,components:[],
@@ -88,13 +91,13 @@ export class StartReminders {
     } catch(error) {
       const status=error instanceof DiscordError ? error.status : 0;
       const ambiguous=error instanceof Error && error.message==='ambiguous_send';
-      const blocked=ambiguous || [400,401,403,404].includes(status) || job.attempts>=3;
+      const blocked=ambiguous || [400,401,403,404].includes(status);
       const delay=Math.max(minute, error instanceof DiscordError ? error.retryAfterMs : 0);
       // A rate-limit response confirms that Discord did not accept this send.
       const code=ambiguous?'ambiguous_send':`discord_${status}`;
       await this.db.prepare(`UPDATE start_reminders SET attempts=attempts+1,blocked=?,last_error=?,next_at=?,
         first_send_at=CASE WHEN ? THEN NULL ELSE first_send_at END WHERE recruitment_id=? AND claim=?`)
-        .bind(blocked?1:0,code,this.clock()+delay,status===429?1:0,id,claim).run();
+        .bind(blocked?1:0,code,this.clock()+delay,status===429 && job.first_send_at===null ? 1 : 0,id,claim).run();
       console.warn('start_reminder_failed',id,code);
     } finally {
       await this.db.prepare('UPDATE start_reminders SET claim=NULL,lease_until=0 WHERE recruitment_id=? AND claim=?').bind(id,claim).run();

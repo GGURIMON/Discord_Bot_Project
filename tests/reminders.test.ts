@@ -120,3 +120,28 @@ it('스레드를 나간 확정 참가자와 단순 구독자는 알림에서 제
   expect([...posts.values()][0]!.allowed_mentions.users).toEqual(['300']);
   expect([...posts.values()][0]!.content).toContain('<@300>');
 });
+
+it('종료 시간만 수정하면 처리 대기 중인 예약과 재시도 기록을 그대로 보존한다',async()=>{
+  const r=await recruit();
+  await store.db.prepare("UPDATE start_reminders SET attempts=1,next_at=due_at+60000,last_error='discord_429' WHERE recruitment_id=?").bind(r.id).run();
+  const row=()=>store.db.prepare('SELECT * FROM start_reminders WHERE recruitment_id=?').bind(r.id).first();
+  const before=await row();
+  await store.db.prepare("UPDATE recruitments SET ends_at=ends_at+60000,time_label='00:10 ~ 01:00' WHERE id=?").bind(r.id).run();
+  expect(await row()).toEqual(before);
+  now+=60000;await cron();expect(posts.size).toBe(1);
+});
+it('5분을 넘긴 적체도 시작 전까지 분당 두 모집씩 전송한다',async()=>{
+  for(let i=0;i<5;i++)await recruit();
+  now=start-4*60000;
+  for(const count of [2,4,5]){await cron();expect(posts.size).toBe(count);now+=60000;}
+});
+it('늦게 429를 받은 경우 시작 전 다음 실행에서 남은 시간을 알린다',async()=>{
+  await recruit();now=start-6*60000;fail=429;await cron();now+=2*60000;await cron();
+  expect([...posts.values()][0]?.content).toContain('시작 4분 전');
+});
+it('응답을 잃고 안전한 재전송 시간을 넘기면 시작 전이라도 다시 보내지 않는다',async()=>{
+  const r=await recruit();loseMessage=true;await cron();
+  now=start-60000;await cron();
+  expect(await store.db.prepare('SELECT last_error FROM start_reminders WHERE recruitment_id=?').bind(r.id).first('last_error')).toBe('ambiguous_send');
+  expect(posts.size).toBe(1);
+});
