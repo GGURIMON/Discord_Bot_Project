@@ -1,3 +1,4 @@
+import { syncThreadJoins } from './threads';
 import { recruitmentMessage } from '../components';
 import { Repository } from '../database/repository';
 import { Discord, DiscordError } from './discord';
@@ -48,7 +49,7 @@ export class MessageSync {
           AND EXISTS(SELECT 1 FROM message_jobs WHERE recruitment_id=? AND lease_owner=?)`).bind(current.version, Date.now() + 600000, id, id, lease).run();
         const result = await this.repo.db.prepare(`DELETE FROM message_jobs WHERE recruitment_id=? AND lease_owner=?
           AND EXISTS(SELECT 1 FROM recruitments WHERE id=? AND synced_version>=version)`).bind(id, lease, id).run();
-        if (result.meta.changes) return;
+        if (result.meta.changes) { await syncThreadJoins(this.repo.db,this.discord,id); return; }
       }
       await this.repo.db.prepare('UPDATE message_jobs SET lease_owner=NULL,lease_expires_at=0 WHERE recruitment_id=? AND lease_owner=?').bind(id, lease).run();
     } catch (error) {

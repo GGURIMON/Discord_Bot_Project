@@ -1,3 +1,4 @@
+import { syncThreadJoins } from './services/threads';
 import { StartReminders } from './services/reminders';
 import { managementOptions } from './components';
 import { Repository } from './database/repository';
@@ -64,6 +65,7 @@ export default {
   },
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
     const repo = new Repository(env.DB);
+    ctx.waitUntil(syncThreadJoins(env.DB,new Discord(env.DISCORD_BOT_TOKEN)));
     ctx.waitUntil(new StartReminders(env.DB,new Discord(env.DISCORD_BOT_TOKEN)).drain());
     ctx.waitUntil((async () => { await repo.maintenance(); await new MessageSync(repo, new Discord(env.DISCORD_BOT_TOKEN)).drain(); })());
   },

@@ -1,3 +1,4 @@
+import { ensureThread,threadMembers } from './threads';
 import { clockTime } from '../domain';
 import { Discord, DiscordError } from './discord';
 
@@ -10,7 +11,7 @@ type Job = {
   recipients: string | null; position: number; first_send_at: number | null;
 };
 type Source = {guild_id:string; channel_id:string; message_id:string; games_json:string; starts_at:number};
-type Thread = {id:string; type:number; guild_id:string; parent_id:string};
+
 
 export class StartReminders {
   constructor(private db:D1Database, private discord:Discord, private clock:()=>number = Date.now) {}
@@ -45,26 +46,18 @@ export class StartReminders {
       if (!r) return;
       const game = (JSON.parse(r.games_json) as {name:string}[]).map(g=>g.name).join(', ');
       if (!job.thread_id) {
-        // A message-started thread shares its starter message ID, including after a lost create response.
-        let thread: Thread;
-        try { thread = await this.discord.request<Thread>('GET',`/channels/${r.message_id}`); }
-        catch (error) {
-          if (!(error instanceof DiscordError) || error.status!==404) throw error;
-          const parent = await this.discord.request<{type:number;guild_id:string}>('GET',`/channels/${r.channel_id}`);
-          if (parent.type!==0 || parent.guild_id!==r.guild_id) throw new DiscordError(400);
-          thread = await this.discord.request<Thread>('POST',`/channels/${r.channel_id}/messages/${r.message_id}/threads`,
-            {name:Array.from(`[시작 알림] ${game}`).slice(0,100).join('')});
-        }
-        if (thread.id!==r.message_id || thread.parent_id!==r.channel_id || thread.guild_id!==r.guild_id || thread.type!==11) throw new DiscordError(400);
+        const thread = await ensureThread(this.discord,r);
         const saved = await this.db.prepare('UPDATE start_reminders SET thread_id=? WHERE recruitment_id=? AND claim=?')
           .bind(thread.id,id,claim).run();
         if (!saved.meta.changes) return;
         job.thread_id=thread.id;
       }
       if (!job.recipients) {
+        const confirmed = await this.db.prepare('SELECT user_id FROM participants WHERE recruitment_id=? ORDER BY joined_at,user_id').bind(id).all<{user_id:string}>();
+        const members = await threadMembers(this.discord,job.thread_id,confirmed.results.map(p=>p.user_id));
         const snapshot = await this.db.prepare(`UPDATE start_reminders SET recipients=(SELECT json_group_array(user_id)
-          FROM (SELECT user_id FROM participants WHERE recruitment_id=? ORDER BY joined_at,user_id))
-          WHERE recruitment_id=? AND claim=? RETURNING recipients`).bind(id,id,claim).first<string>('recipients');
+          FROM (SELECT user_id FROM participants WHERE recruitment_id=? AND user_id IN (SELECT value FROM json_each(?)) ORDER BY joined_at,user_id))
+          WHERE recruitment_id=? AND claim=? RETURNING recipients`).bind(id,JSON.stringify([...members]),id,claim).first<string>('recipients');
         if (!snapshot) return;
         job.recipients=snapshot;
       }

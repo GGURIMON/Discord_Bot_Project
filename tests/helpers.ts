@@ -16,6 +16,7 @@ export async function database() {
   await db.exec(await readFile(new NodeURL('../migrations/0002_time_label.sql', import.meta.url), 'utf8'));
   await db.exec((await readFile(new NodeURL('../migrations/0003_management.sql', import.meta.url), 'utf8')).split('\n').filter(line => !line.trim().startsWith('--')).join(' '));
   await db.exec((await readFile(new NodeURL('../migrations/0004_start_reminders.sql', import.meta.url), 'utf8')).split('\n').join(' '));
+  await db.exec((await readFile(new NodeURL('../migrations/0005_thread_members.sql', import.meta.url), 'utf8')).split('\n').join(' '));
   return { mf, repo: new Repository(db), db };
 }
 export function validData(overrides: Partial<DraftData> = {}): DraftData {
@@ -41,6 +42,7 @@ export class FakeDiscord {
       const status = this.nextStatus; this.nextStatus = 0;
       return Response.json({ retry_after: 1 }, { status });
     }
+    if (method==='GET' && /^\/api\/v10\/channels\/\d+$/.test(path)) return Response.json({id:path.split('/').at(-1),guild_id:scope.guildId,parent_id:scope.channelId,type:11});
     if (path.endsWith('/roles')) return Response.json(this.roleList);
     if (method === 'POST' && path.endsWith('/messages')) {
       const nonce = body.nonce as string;

@@ -1,4 +1,4 @@
-import { emptyDraft, validateDraft } from '../domain';
+import { emptyDraft, timeLabelOf, validateDraft } from '../domain';
 import { UserError, type Draft, type DraftData, type Recruitment, type Scope } from '../types';
 
 export class Repository {
@@ -93,7 +93,7 @@ export class Repository {
     const claim = crypto.randomUUID();
     const r = await this.recruitment(draft.edit_id!);
     if (!r) throw new UserError('모집을 찾을 수 없습니다.');
-    const label = (data.timeText ?? [data.start,data.end].filter(Boolean).join(' ~ ')).trim();
+    const label = timeLabelOf(data);
     const sameStart = label.split(/\s*[~–-]\s*/)[0] === r.time_label?.split(/\s*[~–-]\s*/)[0];
     const v = validateDraft(data,now,sameStart ? r.starts_at : undefined);
     const result = await this.db.batch([

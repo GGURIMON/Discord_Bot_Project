@@ -257,3 +257,12 @@ describe('실제 로컬 D1 통합', () => {
     expect(draftPanel(await store.repo.draft(draftId, scope)).components).toEqual([]);
   });
 });
+
+it('게시와 확정 참가 시 스레드 멤버로 추가하고 대기자는 추가하지 않는다',async()=>{
+  const {r,sync,fake}=await published({maximum:'2'});
+  for(const userId of ['301','302']) {
+    await store.repo.act(unique(),r.id,{...scope,userId},r.message_id!,'join');
+    await sync.run(r.id);
+  }
+  expect(fake.requests.filter(q=>q.method==='PUT').map(q=>q.path.split('/').at(-1))).toEqual([scope.userId,'301']);
+});

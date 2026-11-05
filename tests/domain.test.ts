@@ -18,11 +18,15 @@ describe('모집 입력과 일반 메시지', () => {
   it('직접 입력 게임만으로 작성 가능', () => {
     expect(validateDraft(data({ gameIds: [], customGames: '마인크래프트(생존)' }), now).games).toEqual([{ name: '마인크래프트', mode: '생존' }]);
   });
-  it.each(['24:00', '13:60', '1:00', 'ab:cd'])('잘못된 시간 %s 거부', start => {
+  it.each(['24:00', '13:60', 'ab:cd'])('잘못된 시간 %s 거부', start => {
     expect(() => validateDraft(data({ start }), now)).toThrow('HH:mm');
   });
   it.each(['지금', '지금부터', '13:00', '13:00 ~ 14:30', '14:00 - 15:00'])('시간 표기 유지 %s', timeText => {
     expect(validateDraft(data({ timeText }), now).timeLabel).toBe(timeText);
+  });
+  it('한 자리 시각과 시간 범위를 정규화한다',()=>{
+    for (const [input,label] of [['6:10','06:10'],['6:10 ~ 7:30','06:10 ~ 07:30']] as const)
+      expect(validateDraft(data({timeText:input}),now).timeLabel).toBe(label);
   });
   it('자정 경계와 UTC 날짜 보존', () => {
     const v = validateDraft(data({ start: '23:00', end: '01:00' }), now);

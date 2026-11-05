@@ -16,6 +16,14 @@ const json=(data:unknown,status=200)=>Response.json(data,{status});
 const http:HttpFetch=async(url,init)=>{
   const path=new URL(url).pathname.replace('/api/v10','');
   const [, ,channel,,message]=path.split('/');
+  if (path.includes('/thread-members/')) {
+    const user_id=path.split('/').at(-1)!;
+    return json({user_id},['300','302','999'].includes(user_id)?200:404);
+  }
+  if (path.endsWith('/thread-members')) {
+    const users=['300','302','999',...Array.from({length:80},(_,i)=>String(1000000000000000000n+BigInt(i)))];
+    return json(users.map(user_id=>({user_id})));
+  }
   if (init?.method==='GET') return json(threads.get(channel!) ?? {type:0,guild_id:channel==='201'?'101':'100'},
     threads.has(channel!) || ['200','201'].includes(channel!) ? 200 : 404);
   if (path.endsWith('/threads')) {
@@ -103,4 +111,12 @@ it('확정 명단을 Discord 길이·멘션 한도에 맞춰 분할한다',async
   const users=[...posts.values()].flatMap(p=>p.allowed_mentions.users);
   expect(users).toHaveLength(81);expect(new Set(users).size).toBe(81);
   expect([...posts.values()].every(p=>p.content.length<=2000)).toBe(true);
+});
+
+it('스레드를 나간 확정 참가자와 단순 구독자는 알림에서 제외한다',async()=>{
+  const r=await recruit();
+  await store.repo.act(String(++sequence),r.id,{...scope,userId:'301'},r.message,'join',created+1000);
+  await cron();
+  expect([...posts.values()][0]!.allowed_mentions.users).toEqual(['300']);
+  expect([...posts.values()][0]!.content).toContain('<@300>');
 });

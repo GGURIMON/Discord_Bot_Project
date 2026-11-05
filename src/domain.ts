@@ -39,10 +39,13 @@ export function gamesOf(data: DraftData): Game[] {
   if (games.length > 25) throw new UserError('한 모집에는 최대 25개 게임을 입력할 수 있습니다.');
   return games;
 }
+export function timeLabelOf(data:DraftData) {
+  return (data.timeText ?? [data.start,data.end].filter(Boolean).join(' ~ ')).trim().replace(/\b(\d):(?=\d{2}\b)/g,'0$1:');
+}
 export function validateDraft(data: DraftData, now = Date.now(), retainedStart?: number) {
   if (data.roleError) throw new UserError(data.roleError);
   const games = gamesOf(data);
-  const timeLabel = (data.timeText ?? [data.start, data.end].filter(Boolean).join(' ~ ')).trim();
+  const timeLabel = timeLabelOf(data);
   const times = timeLabel.match(/^([01]\d|2[0-3]):([0-5]\d)(?:\s*[~–-]\s*([01]\d|2[0-3]):([0-5]\d))?$/);
   const immediate = ['지금', '지금부터'].includes(timeLabel);
   if (!immediate && !times) throw new UserError('시간은 지금, HH:mm 또는 HH:mm ~ HH:mm으로 입력해 주세요.');
