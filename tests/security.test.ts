@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { Interactions } from '../src/interactions';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
 import { verifySignature } from '../src/security';
 import type { Env } from '../src/types';
@@ -51,4 +52,18 @@ describe('HTTP 서명 및 초기 응답', () => {
     expect(performance.now() - start).toBeLessThan(2300);
     expect(pending).toHaveLength(1);
   });
+});
+
+it.each([
+  ['recent', 64, 6], ['copy', 64, 6], ['m:1:edit:2', 64, 6],
+  ['d:1:2:discard:0', 64, 6], ['r:1:manage', 0, 5],
+])('버튼 %s의 원본 메시지에 맞게 응답한다', async (custom_id, flags, type) => {
+  const mock = vi.spyOn(Interactions.prototype, 'process').mockResolvedValue();
+  try {
+    const body = { type: 3, id: '900', application_id: '123', token: 'x', guild_id: '1', channel_id: '2',
+      member: { user: { id: '3' } }, message: { id: '4', flags }, data: { custom_id } };
+    const env = { DISCORD_PUBLIC_KEY: publicKey, DISCORD_APPLICATION_ID: '123' } as Env;
+    const response = await worker.fetch(await signed(JSON.stringify(body)), env, { waitUntil() {} } as unknown as ExecutionContext);
+    expect(await response.json()).toEqual(type === 6 ? { type: 6 } : { type: 5, data: { flags: 64 } });
+  } finally { mock.mockRestore(); }
 });

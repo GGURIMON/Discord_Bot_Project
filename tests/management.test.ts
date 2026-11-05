@@ -78,7 +78,10 @@ it('완료 후 신규 참가 차단, 명단 조회 및 복사는 유지하고 �
   const base={id:event(),application_id:'999',token:'x',type:3,guild_id:scope.guildId,channel_id:scope.channelId,member:{user:{id:scope.userId}},message:{id:r.message_id!}};
   expect((await handler.handle({...base,data:{custom_id:`r:${r.id}:members`}})).content).toContain('1. <@301>');
   const copy=await handler.handle({...base,data:{custom_id:'copy',values:[r.id]}});
-  expect(copy.content).toContain('시간');
+  expect(copy.content).toContain(r.time_label);
+  expect(copy.content).toContain('<@&400>');
+  expect(copy.content).toContain('[1/1]');
+  expect(copy.components[0]?.components?.[1]?.disabled).toBe(false);
   await expect(handler.handle({...base,guild_id:'wrong',data:{custom_id:'copy',values:[r.id]}})).rejects.toThrow();
 });
 it('수정은 기존 글 유지, 정원 감소/권한 변경 방어 및 재멘션 차단',async()=>{

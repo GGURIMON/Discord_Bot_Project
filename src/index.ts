@@ -50,7 +50,7 @@ export default {
       } finally { clearTimeout(timer); }
     }
     ctx.waitUntil(handler.process(interaction));
-    const updatePrivatePanel = Boolean(interaction.message && interaction.data?.custom_id?.startsWith('d:')) || interaction.data?.custom_id === 'dismiss' || /^r:[^:]+:(?:cancel|membersPage):/.test(interaction.data?.custom_id ?? '');
+    const updatePrivatePanel = Boolean((interaction.message?.flags ?? 0) & 64);
     return Response.json(updatePrivatePanel ? { type: 6 } : { type: 5, data: { flags: 64 } });
   },
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {

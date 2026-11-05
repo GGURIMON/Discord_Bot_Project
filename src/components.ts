@@ -15,7 +15,10 @@ export function draftPanel(draft: Draft, page = 0, notice = '', now = Date.now()
   try {
     const value = validateDraft(data, now);
     preview = formatContent(draft.owner_id, value.games, value.startsAt, value.endsAt, 1, value.maximum, value.roles, 'open', value.timeLabel);
-  } catch (error) { problem = error instanceof Error ? error.message : '입력을 확인해 주세요.'; }
+  } catch (error) { problem = error instanceof Error ? error.message : '입력을 확인해 주세요.';
+    if (data.customGames) {
+      preview = [data.customGames, data.timeText, data.maximum && `최대 ${data.maximum}명`, data.roles.map(role => `<@&${role.id}>`).join(', '), problem].filter(Boolean).join('\n');
+    } }
   if (draft.consumed_by) return privateText('모집 게시를 접수했습니다. 이 패널은 다시 게시할 수 없습니다.');
   const components = [
     row(button(`${key}:details:${page}`, '모집 내용 입력', 1), button(`${key}:publish:${page}`, draft.edit_id ? '✅ 수정 저장' : '✅ 모집 게시', 3, Boolean(problem)), button(`${key}:discard:${page}`, '작성 취소', 4)),

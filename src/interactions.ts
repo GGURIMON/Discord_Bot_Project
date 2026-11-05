@@ -83,7 +83,7 @@ export class Interactions {
     if (customId === 'recent') {
       const recent = await this.repo.db.prepare('SELECT id,games_json FROM recruitments WHERE guild_id=? AND creator_id=? ORDER BY created_at DESC,id DESC LIMIT 5').bind(scope.guildId,scope.userId).all<{id:string;games_json:string}>();
       if (!recent.results.length) return privateText('복사할 모집이 없습니다.');
-      return {...privateText('복사할 모집을 선택해 주세요. 시간은 새로 입력해야 합니다.'),components:[row({type:3,custom_id:'copy',options:recent.results.map((r,i)=>({label:`${i+1}. ${JSON.parse(r.games_json).map((g:{name:string})=>g.name).join(', ')}`.slice(0,100),value:r.id}))})]};
+      return {...privateText('복사할 모집을 선택해 주세요. 기존 시간도 함께 불러옵니다.'),components:[row({type:3,custom_id:'copy',options:recent.results.map((r,i)=>({label:`${i+1}. ${JSON.parse(r.games_json).map((g:{name:string})=>g.name).join(', ')}`.slice(0,100),value:r.id}))})]};
     }
     if (customId === 'copy') {
       const r = await this.repo.recruitment(interaction.data?.values?.[0] ?? '');
@@ -142,7 +142,7 @@ export class Interactions {
     this.checkVersion(draft, parsed.version);
     if (parsed.action === 'discard') {
       await this.repo.discardDraft(draft);
-      return privateText('모집 작성을 취소했습니다.');
+      return privateText(draft.edit_id ? '모집 수정을 취소했습니다.' : '모집 작성을 취소했습니다.');
     }
     const data: DraftData = JSON.parse(draft.payload);
     if (parsed.action === 'games') {

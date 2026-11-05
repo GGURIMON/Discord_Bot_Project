@@ -8,12 +8,12 @@ export async function seedDraft(repo: Repository, event: string, scope: Scope, r
   const draft = await repo.createDraft(event, scope);
   const data: DraftData = { ...emptyDraft(),
     customGames: JSON.parse(r.games_json).map((g: {name:string;mode?:string}) => g.name + (g.mode ? `(${g.mode})` : '')).join('\n'),
-    maximum: String(r.max_members), timeText: edit ? r.time_label ?? `${clockTime(r.starts_at)} ~ ${clockTime(r.ends_at)}` : '',
+    maximum: String(r.max_members), timeText: r.time_label ?? `${clockTime(r.starts_at)} ~ ${clockTime(r.ends_at)}`,
     date: edit ? seoulDate(r.starts_at) : seoulDate(),
     roles: JSON.parse(r.role_ids_json).map((id:string) => ({id,name:id,mentionable:false})),
   };
   await repo.db.prepare('UPDATE drafts SET edit_id=? WHERE id=?').bind(edit ? r.id : null,draft.id).run();
-  return draftPanel({...await repo.saveDraft(draft,data),edit_id:edit ? r.id : null});
+  return draftPanel({...await repo.saveDraft(draft,data),edit_id:edit ? r.id : null}, 0, edit ? '' : '이전 모집을 복사했습니다. 시간과 내용을 확인한 뒤 게시해 주세요.');
 }
 export async function managementUI(repo: Repository, interaction: Interaction, scope: Scope) {
   const [prefix,id,action,message,target] = (interaction.data?.custom_id ?? '').split(':');
