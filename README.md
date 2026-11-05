@@ -1,20 +1,21 @@
 # Discord 게임 모집 봇
 
-`/모집`으로 나에게만 보이는 입력 패널을 열고, 게임·시간·최대 인원을 입력하면 **✅ 모집 게시** 버튼이 활성화된다. 게시된 일반 메시지에서 참가와 취소를 누르면 인원이 반영되고, 정원이 차면 참가 버튼이 잠긴다. 빈자리가 생기면 다시 열린다.
+`/모집`으로 나에게만 보이는 입력 패널을 열고, 게임·시간·최대 인원을 입력하고 알릴 역할을 하나 이상 선택하면 **✅ 모집 게시** 버튼이 활성화된다. 게시된 일반 메시지에서 참가와 취소를 누르면 인원이 반영되고, 정원이 차면 참가 버튼이 잠긴다. 빈자리가 생기면 다시 열린다.
 
 ```text
+@모집자님이 모집 중에 있습니다.
 게임 이름 / 13:00 ~ 14:30 / [1/4] / @FPS(모든장르), @스팀(모든장르)
 [참가하기] [참가 취소] [모집 취소]
 ```
 
-TypeScript · Cloudflare Workers · D1 · Discord HTTP Interactions를 사용한다. Gateway 연결이나 개인 PC 상시 실행은 필요하지 않다. 현재 저장소는 로컬 구현이며, 실서버 사용에는 아래 외부 설정과 배포가 필요하다.
+TypeScript · Cloudflare Workers · D1 · Discord HTTP Interactions를 사용한다. Gateway 연결이나 개인 PC 상시 실행은 필요하지 않다. 테스트 서버에는 staging Worker가 배포되어 있다. 공개 설정의 빈 값과 REPLACE_ 표시는 각 배포 환경에서 채운다.
 
 ## 사용자 흐름
 
 1. 서버 채널에서 `/모집` 실행.
 2. `모집 내용 입력`을 누르고 게임명을 직접 쓴다. 모드를 함께 적거나 줄마다 다른 게임을 적을 수 있다.
 3. 시간에는 `지금`, `지금부터`, `13:00` 또는 `13:00 ~ 14:30`을 쓰고 모집자를 포함한 정원을 입력한다.
-4. 모집 내용 입력 창에서 서버의 게임 알림 역할을 복수 선택한다. 비워 두면 멘션 없이 게시한다.
+4. 모집 내용 입력 창에서 서버의 게임 알림 역할을 1~25개 선택한다. 역할을 선택해야 게시할 수 있다.
 5. 미리보기를 확인하고 활성화된 `✅ 모집 게시` 클릭.
 6. 모집자는 자동으로 첫 참가자. 정원이 1명이면 바로 참가 마감.
 7. 모집자 본인의 참가만 취소할 수는 없으며, `모집 취소` → 개인 확인 버튼으로 전체 모집을 취소.
@@ -82,11 +83,11 @@ npm run commands:register
 
 ## CI/CD와 GitHub
 
-현재 폴더에는 Git이 초기화되어 있다. 원격 저장소 연결과 push는 아직 수행하지 않았다.
+공개 저장소에는 실제 환경 식별값과 토큰을 포함하지 않는다. 기존 staging 환경을 사용한다면 해당 D1을 재사용하고 새로 생성하지 않는다.
 
-GitHub Actions를 사용한다. PR/main push에서 `npm run check`와 dry-run 빌드를 실행한다. 운영 배포는 Actions의 **승인된 운영 배포**를 main에서 수동 실행한다. 워크플로가 검사, D1 migration, 배포 순서를 자동 수행한다. 사용자 승인 없는 최초 외부 배포를 피하기 위해 push만으로 운영 배포가 시작되지는 않는다.
+GitHub Actions를 사용한다. Actions의 **검사**를 수동 실행하면 `npm run check`와 dry-run 빌드를 실행한다. 운영 배포는 Actions의 **승인된 운영 배포**를 main에서 수동 실행한다. 워크플로가 검사, D1 migration, 배포 순서를 자동 수행한다. 사용자 승인 없는 최초 외부 배포를 피하기 위해 push만으로 운영 배포가 시작되지는 않는다.
 
-GitHub의 `production` Environment에 배포용 최소 권한 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`를 저장한다. 환경 승인 기능을 사용할 수 있으면 required reviewers를 설정한다. 워크플로의 `environment` 선언만으로 승인자가 자동 설정되지는 않으며, 계정/저장소 유형에 따라 해당 기능의 제공 범위가 다르다. 지원하지 않으면 workflow_dispatch 실행 권한으로 승인 단계를 관리한다. Bot Token은 Cloudflare Secrets에 둔다.
+GitHub의 `production` Environment에 배포용 최소 권한 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`를 저장한다. 같은 Environment의 Variables에 DISCORD_APPLICATION_ID, DISCORD_PUBLIC_KEY, D1_DATABASE_ID를 설정한다. 워크플로는 이 값을 실행 중에만 운영 설정에 채운다. 환경 승인 기능을 사용할 수 있으면 required reviewers를 설정한다. 워크플로의 `environment` 선언만으로 승인자가 자동 설정되지는 않으며, 계정/저장소 유형에 따라 해당 기능의 제공 범위가 다르다. 지원하지 않으면 workflow_dispatch 실행 권한으로 승인 단계를 관리한다. Bot Token은 Cloudflare Secrets에 둔다.
 
 ## 구조와 안정성
 

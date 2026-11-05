@@ -10,7 +10,7 @@
 | 모집 생성 | src/interactions.ts, src/components.ts, src/domain.ts, src/config/games.ts | 개인 패널, 메뉴, 모달, 게임 복수/직접 입력, 모드, 시간, 정원, 역할, 유효 입력 시 확인 버튼 활성화 |
 | 참가 관리 | migrations/0001_initial.sql, src/database/repository.ts | 작성자 자동 참가, 원자적 정원 관리, 중복 방지, 취소와 재개방, 작성자 전체 취소 |
 | 안정화 | src/services/discord.ts, src/services/sync.ts | rate limit, 백오프, 영속 작업, 갱신 lease, 멱등성, 버전 재검사, 주기적 재동기화 |
-| 배포 준비 | .github/workflows, scripts/register-commands.mjs, .dev.vars.example | PR 검사, 수동 승인 운영 배포, 명령어 등록 스크립트, 설정 예시 |
+| 배포 준비 | .github/workflows, scripts/register-commands.mjs, .dev.vars.example | 수동 검사, 수동 승인 운영 배포, 명령어 등록 스크립트, 설정 예시 |
 | 문서 | README.md, docs/OPERATIONS.md | 로컬 실행, 외부 설정, 배포, 무료 한도, 장애 복구 |
 
 ## 실행한 검증
@@ -49,4 +49,4 @@ D1 통합 테스트는 Miniflare/workerd의 로컬 D1을 사용했다. Discord H
 
 ## 아직 필요한 외부 검증
 
-실제 Discord의 메뉴/모달 렌더링과 역할 알림 도달, Cloudflare 원격 D1 및 무료 CPU 한도, GitHub Actions 실행은 계정 연결과 staging 배포 후 검증해야 한다. 로컬 테스트 통과를 실제 서버 검증 완료로 취급하지 않는다. 외부 리소스 생성·명령어 등록·GitHub 연결·운영 배포는 아직 수행하지 않았다.
+실제 Discord의 메뉴/모달 렌더링과 역할 알림 도달, Cloudflare 원격 D1 및 무료 CPU 한도, GitHub Actions 실행은 계정 연결과 staging 배포 후 검증해야 한다. 로컬 테스트 통과를 실제 서버 검증 완료로 취급하지 않는다. 이후 staging 배포와 GitHub 업로드를 완료했다. 실제 클라이언트 검증은 테스트 서버에서 별도로 진행한다.

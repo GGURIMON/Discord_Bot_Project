@@ -201,6 +201,13 @@ describe('실제 로컬 D1 통합', () => {
     expect((await store.repo.recruitment(r.id))!.status).toBe('publish_failed');
     expect(fake.messages.size).toBe(0);
   });
+  it('역할 없는 초안은 직접 게시 요청도 거부한다', async () => {
+    const draft = await store.repo.createDraft(unique(), scope);
+    const data = validData({ roles: [] });
+    const saved = await store.repo.saveDraft(draft, data);
+    await expect(store.repo.publishDraft(saved, data)).rejects.toThrow('알릴 역할');
+    expect(await store.repo.recruitment(draft.id)).toBeNull();
+  });
   it('개인 패널 → 수기 게임/서버 역할 → Modal → 확인 활성화 → 게시 흐름', async () => {
     const fake = new FakeDiscord();
     fake.roleList[0]!.mentionable = false;

@@ -30,6 +30,25 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: 운영 환경 설정 확인 및 적용
+        env:
+          DISCORD_APPLICATION_ID: ${{ vars.DISCORD_APPLICATION_ID }}
+          DISCORD_PUBLIC_KEY: ${{ vars.DISCORD_PUBLIC_KEY }}
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const { DISCORD_APPLICATION_ID, DISCORD_PUBLIC_KEY, D1_DATABASE_ID } = process.env;
+          if (!/^\d{17,20}$/.test(DISCORD_APPLICATION_ID) ||
+              !/^[a-f0-9]{64}$/i.test(DISCORD_PUBLIC_KEY) ||
+              !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(D1_DATABASE_ID)) {
+            throw new Error('production Environment의 Discord 및 D1 변수를 확인하세요.');
+          }
+          const config = JSON.parse(readFileSync('wrangler.jsonc', 'utf8'));
+          config.env.production.vars = { DISCORD_APPLICATION_ID, DISCORD_PUBLIC_KEY };
+          config.env.production.d1_databases[0].database_id = D1_DATABASE_ID;
+          writeFileSync('wrangler.jsonc', JSON.stringify(config));
+          JS
       - name: 운영 D1 마이그레이션
         run: npx wrangler d1 migrations apply DB --remote --env production
         env:
