@@ -14,6 +14,10 @@ export async function database() {
   // D1 exec는 줄 단위로 파싱하므로 trigger 전체를 포함한 SQL을 한 줄로 보낸다.
   await db.exec(sql.split('\n').filter(line => !line.trim().startsWith('--')).join(' '));
   await db.exec(await readFile(new NodeURL('../migrations/0002_time_label.sql', import.meta.url), 'utf8'));
+  await db.exec((await readFile(new NodeURL('../migrations/0003_management.sql', import.meta.url), 'utf8')).split('\n').filter(line => !line.trim().startsWith('--')).join(' '));
+  await db.exec((await readFile(new NodeURL('../migrations/0004_start_reminders.sql', import.meta.url), 'utf8')).split('\n').join(' '));
+  await db.exec((await readFile(new NodeURL('../migrations/0005_thread_members.sql', import.meta.url), 'utf8')).split('\n').join(' '));
+  await db.exec((await readFile(new NodeURL('../migrations/0006_preserve_start_reminder.sql', import.meta.url), 'utf8')).split('\n').join(' '));
   return { mf, repo: new Repository(db), db };
 }
 export function validData(overrides: Partial<DraftData> = {}): DraftData {
@@ -39,6 +43,7 @@ export class FakeDiscord {
       const status = this.nextStatus; this.nextStatus = 0;
       return Response.json({ retry_after: 1 }, { status });
     }
+    if (method==='GET' && /^\/api\/v10\/channels\/\d+$/.test(path)) return Response.json({id:path.split('/').at(-1),guild_id:scope.guildId,parent_id:scope.channelId,type:11});
     if (path.endsWith('/roles')) return Response.json(this.roleList);
     if (method === 'POST' && path.endsWith('/messages')) {
       const nonce = body.nonce as string;

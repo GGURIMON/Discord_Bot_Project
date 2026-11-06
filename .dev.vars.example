@@ -1,5 +1,5 @@
 DISCORD_APPLICATION_ID=""
 DISCORD_PUBLIC_KEY=""
 DISCORD_BOT_TOKEN=""
-# 개발 서버 명령어 등록에만 사용
-DISCORD_GUILD_ID=""
+# 전역 등록 성공 후 이 서버들의 기존 /모집만 정리 (쉼표 구분, 선택)
+DISCORD_LEGACY_GUILD_IDS=""

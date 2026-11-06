@@ -47,10 +47,10 @@ describe('실제 로컬 D1 통합', () => {
     const { r, sync, fake } = await published();
     const results = await Promise.all(Array.from({ length: 20 }, (_, i) => store.repo.act(unique(), r.id, { ...scope, userId: String(700 + i) }, r.message_id!, 'join')));
     expect(results.filter(result => result === 'joined')).toHaveLength(3);
-    expect(results.filter(result => result === 'full')).toHaveLength(17);
+    expect(results.filter(result => result === 'waiting')).toHaveLength(17);
     expect((await store.repo.recruitment(r.id))!.member_count).toBe(4);
     await sync.run(r.id);
-    expect(fake.messages.get(r.message_id!)!.components[0]!.components![0]!.disabled).toBe(true);
+    expect(fake.messages.get(r.message_id!)!.components[0]!.components![0]!.disabled).toBe(false);
     const member = await store.db.prepare('SELECT user_id FROM participants WHERE recruitment_id=? AND user_id!=? LIMIT 1').bind(r.id, scope.userId).first<{ user_id: string }>();
     await store.repo.act(unique(), r.id, { ...scope, userId: member!.user_id }, r.message_id!, 'leave');
     await sync.run(r.id);
@@ -65,7 +65,7 @@ describe('실제 로컬 D1 통합', () => {
     const guest = { ...scope, userId: '301' };
     await store.repo.act(unique(), r.id, guest, r.message_id!, 'join');
     const full = await handler.handle(click);
-    expect(full.content.split('\n').slice(1)).toEqual([`<@${scope.userId}> (모집자)`, '<@301>']);
+    expect(full.content.split('\n').slice(1)).toEqual([`<@${scope.userId}> (모집자)`, '<@301>', '', '대기자 목록 · 0명']);
     expect(full.allowed_mentions.users).toEqual([]);
     await store.repo.act(unique(), r.id, guest, r.message_id!, 'leave');
     expect((await handler.handle(click)).content).not.toContain('<@301>');
@@ -81,7 +81,7 @@ describe('실제 로컬 D1 통합', () => {
   });
   it('정원 1명, DB 직접 삽입도 초과를 차단', async () => {
     const { r, fake } = await published({ maximum: '1' });
-    expect(fake.messages.get(r.message_id!)!.components[0]!.components![0]!.disabled).toBe(true);
+    expect(fake.messages.get(r.message_id!)!.components[0]!.components![0]!.disabled).toBe(false);
     await expect(store.db.prepare('INSERT INTO participants VALUES(?,?,?,?)').bind(unique(), r.id, '999', Date.now()).run()).rejects.toThrow('participant_guard');
   });
   it('작성자 참가 고정, 타인 취소 거부, 작성자 전체 취소', async () => {
@@ -91,7 +91,7 @@ describe('실제 로컬 D1 통합', () => {
     expect(await store.repo.act(unique(), r.id, scope, r.message_id!, 'cancel')).toBe('cancelled');
     await sync.run(r.id);
     const body = fake.messages.get(r.message_id!)!;
-    expect(body.components[0]!.components![3]!.disabled).toBe(false);
+    expect(body.components[0]!.components![3]!.disabled).toBe(true);
     expect(body.content).toMatch(/^\[취소됨\]/);
     expect(body.components[0]!.components!.slice(0, 3).every(button => button.disabled)).toBe(true);
     expect(await store.repo.act(unique(), r.id, { ...scope, userId: '301' }, r.message_id!, 'join')).toBe('closed');
@@ -256,4 +256,13 @@ describe('실제 로컬 D1 통합', () => {
     }
     expect(draftPanel(await store.repo.draft(draftId, scope)).components).toEqual([]);
   });
+});
+
+it('게시와 확정 참가 시 스레드 멤버로 추가하고 대기자는 추가하지 않는다',async()=>{
+  const {r,sync,fake}=await published({maximum:'2'});
+  for(const userId of ['301','302']) {
+    await store.repo.act(unique(),r.id,{...scope,userId},r.message_id!,'join');
+    await sync.run(r.id);
+  }
+  expect(fake.requests.filter(q=>q.method==='PUT').map(q=>q.path.split('/').at(-1))).toEqual([scope.userId,'301']);
 });

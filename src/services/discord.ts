@@ -27,12 +27,28 @@ export class Discord {
     if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
   }
+  async memberDisplayName(guildId: string, userId: string) {
+    const member = await this.request<{nick?:string|null; user:{global_name?:string|null;username:string}}>(
+      'GET', `/guilds/${guildId}/members/${userId}`);
+    return member.nick || member.user.global_name || member.user.username;
+  }
+  async notifyTransfer(userId: string, requestId: string, postUrl: string) {
+    const dm = await this.request<{id:string}>('POST','/users/@me/channels',{recipient_id:userId});
+    return this.create(dm.id, requestId, {
+      content: `<@${userId}>님에게 모집자 권한 위임 요청이 도착했습니다. 15분 안에 모집글 설정의 ‘위임 응답’에서 수락하거나 거절해 주세요.`,
+      components: [{type:1,components:[{type:2,style:5,label:'모집글 열기',url:postUrl}]}],
+      allowed_mentions: {...NO_MENTIONS,users:[userId]},
+    });
+  }
   roles(guildId: string) { return this.request<Role[]>('GET', `/guilds/${guildId}/roles`); }
   create(channelId: string, id: string, payload: MessagePayload) {
     return this.request<{ id: string }>('POST', `/channels/${channelId}/messages`, { ...payload, nonce: id, enforce_nonce: true });
   }
   edit(channelId: string, messageId: string, payload: MessagePayload) {
     return this.request('PATCH', `/channels/${channelId}/messages/${messageId}`, { ...payload, allowed_mentions: NO_MENTIONS });
+  }
+  deleteReply(interaction: Interaction) {
+    return this.request('DELETE', `/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, undefined, false);
   }
   reply(interaction: Interaction, payload: MessagePayload) {
     return this.request('PATCH', `/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, payload, false);

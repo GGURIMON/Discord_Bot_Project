@@ -1,3 +1,5 @@
+import { scoped } from './database/management';
+import { managementUI, seedDraft } from './management-ui';
 import { GAMES } from './config/games';
 import { button, detailsModal, draftPanel, NO_MENTIONS, privateText, row } from './components';
 import { Repository } from './database/repository';
@@ -12,8 +14,10 @@ function gameRoles(roles: Role[], guildId: string) {
   return roles.filter(role => !role.managed && role.id !== guildId && gameRoleNames.has(shortRoleName(role.name))).slice(0, 25);
 }
 
+const editSaved = privateText('모집글에 수정을 반영했습니다.');
+const closeCancelledPanel = privateText('모집을 취소했습니다.');
 const resultTexts: Record<string, string> = {
-  joined: '참가했습니다.', left: '참가를 취소했습니다.', cancelled: '모집을 취소했습니다.',
+  waiting: '대기 신청했습니다.', already_waiting: '이미 대기 중입니다.', unwaited: '대기를 취소했습니다.', joined: '참가했습니다.', left: '참가를 취소했습니다.', cancelled: '모집을 취소했습니다.',
   already_joined: '이미 참가 중입니다.', not_joined: '참가 중인 모집이 아닙니다.',
   full: '정원이 가득 찼습니다.', closed: '취소되었거나 종료된 모집입니다.',
   owner_fixed: '모집자는 기본 참가자로 고정됩니다. 전체 취소는 모집 취소 버튼을 눌러 주세요.',
@@ -42,7 +46,16 @@ export class Interactions {
   // Modal은 초기 응답 자체여야 한다. DB 접근에는 별도 짧은 deadline을 적용한다.
   async openModal(interaction: Interaction) {
     const scope = getScope(interaction);
-    const parsed = parseDraftId(interaction.data?.custom_id ?? '');
+    const customId = interaction.data?.custom_id ?? '';
+    const edit = /^([rm]):(\d+):edit(?::(\d+))?$/.exec(customId);
+    if (edit) {
+      const messageId = edit[1] === 'r' ? interaction.message?.id : edit[3];
+      const r = await scoped(this.repo,edit[2]!,scope,messageId ?? '',true);
+      if (r.completed || r.status !== 'open' || r.ends_at <= Date.now()) throw new UserError('마감된 모집입니다.');
+      const [draft, roles] = await Promise.all([seedDraft(this.repo,interaction.id,scope,r,true), this.discord.roles(scope.guildId)]);
+      return detailsModal(draft,0,gameRoles(roles,scope.guildId));
+    }
+    const parsed = parseDraftId(customId);
     const [draft, roles] = await Promise.all([this.repo.draft(parsed.id, scope), this.discord.roles(scope.guildId)]);
     this.checkVersion(draft, parsed.version);
     return detailsModal(draft, parsed.page, gameRoles(roles, scope.guildId));
@@ -67,6 +80,25 @@ export class Interactions {
         } catch { /* 만료된 패널은 재실행 안내만 표시한다. */ }
       }
     }
+    // 공개 글에서 시작한 작업은 type 5 개인 응답, 개인 패널 안의 작업은 type 6으로 갱신한다.
+    const actionId = interaction.data?.custom_id ?? '';
+    const terminalManagement = !payload.components.length && (actionId.startsWith('m:') ||
+      actionId.endsWith(':transferInbox') || actionId === 'dismiss' || payload === editSaved);
+    if (terminalManagement && payload !== editSaved && actionId !== 'dismiss') {
+      try {
+        await this.discord.reply(interaction,payload);
+        await new Promise(resolve=>setTimeout(resolve,3500));
+      } catch { return; }
+    }
+    if (terminalManagement || (payload === closeCancelledPanel && ((interaction.message?.flags ?? 0) & 64))) {
+      try {
+        await this.discord.deleteReply(interaction);
+        return;
+      } catch (error) {
+        if (error instanceof DiscordError && error.status === 404) return;
+        // 삭제에 실패해도 이미 처리된 버튼은 제거한다.
+      }
+    }
     try { await this.discord.reply(interaction, payload); }
     catch { console.warn(JSON.stringify({ event: 'interaction_reply_failed', interactionId: interaction.id })); }
   }
@@ -77,6 +109,24 @@ export class Interactions {
       return draftPanel(await this.repo.createDraft(interaction.id, scope));
     }
     const customId = interaction.data?.custom_id ?? '';
+    const parsed = customId.startsWith('d:') ? parseDraftId(customId) : undefined;
+    if (customId === 'recent' || parsed?.action === 'recent') {
+      const source = parsed ? await this.repo.draft(parsed.id,scope) : await this.repo.createDraft(interaction.id,scope);
+      if (parsed) this.checkVersion(source,parsed.version);
+      const key = `d:${source.id}:${source.version}`;
+      const recent = await this.repo.db.prepare('SELECT id,games_json FROM recruitments WHERE guild_id=? AND creator_id=? ORDER BY created_at DESC,id DESC LIMIT 5').bind(scope.guildId,scope.userId).all<{id:string;games_json:string}>();
+      if (!recent.results.length) return draftPanel(source,0,'복사할 모집이 없습니다.');
+      return {...privateText('복사할 모집을 선택해 주세요. 기존 시간도 함께 불러옵니다.'),components:[row({type:3,custom_id:`${key}:copy`,options:recent.results.map((r,i)=>({label:`${i+1}. ${JSON.parse(r.games_json).map((g:{name:string})=>g.name).join(', ')}`.slice(0,100),value:r.id}))}),row(button(`${key}:page:0`,'복사 취소'))]};
+    }
+    if (customId === 'copy' || parsed?.action === 'copy') {
+      if (parsed) this.checkVersion(await this.repo.draft(parsed.id,scope),parsed.version);
+      const r = await this.repo.recruitment(interaction.data?.values?.[0] ?? '');
+      const allowed = await this.repo.db.prepare('SELECT id FROM recruitments WHERE guild_id=? AND creator_id=? ORDER BY created_at DESC,id DESC LIMIT 5').bind(scope.guildId,scope.userId).all<{id:string}>();
+      if (!r || !allowed.results.some(x=>x.id===r.id)) throw new UserError('복사할 수 없는 모집입니다.');
+      return draftPanel(await seedDraft(this.repo,interaction.id,scope,r,false,parsed?.id),0,'이전 모집을 복사했습니다. 시간과 내용을 확인한 뒤 게시해 주세요.');
+    }
+    const managed = await managementUI(this.repo,this.discord,interaction,scope);
+    if (managed) { const id = customId.split(':')[1]; if (id) await this.sync.run(id); return managed; }
     if (customId.startsWith('d:')) return this.handleDraft(interaction, scope);
     if (customId === 'dismiss') return privateText('모집 취소를 중단했습니다.');
     const [prefix, id, action, sourceMessage, pageText] = customId.split(':');
@@ -84,12 +134,13 @@ export class Interactions {
       const messageId = action === 'members' ? interaction.message?.id : sourceMessage;
       if (!messageId) throw new UserError('모집 메시지를 확인할 수 없습니다.');
       const members = await this.repo.participants(id, scope, messageId);
-      const pageSize = 50;
-      const pages = Math.ceil(members.length / pageSize);
+      const waiting = await this.repo.db.prepare('SELECT user_id FROM waiting WHERE recruitment_id=? AND promoted=0 ORDER BY sequence').bind(id).all<{user_id:string}>();
+      const allLines = [...members.map(member => `<@${member.user_id}>${member.user_id === member.owner_id ? ' (모집자)' : ''}`), `\n대기자 목록 · ${waiting.results.length}명`, ...waiting.results.map((u,i)=>`${i+1}. <@${u.user_id}>`)];
+      const pageSize = 40;
+      const pages = Math.ceil(allLines.length / pageSize);
       const requested = Number(pageText ?? 0);
       const page = Number.isSafeInteger(requested) ? Math.max(0, Math.min(requested, pages - 1)) : 0;
-      const lines = members.slice(page * pageSize, (page + 1) * pageSize)
-        .map(member => `<@${member.user_id}>${member.user_id === member.owner_id ? ' (모집자)' : ''}`);
+      const lines = allLines.slice(page * pageSize, (page + 1) * pageSize);
       const panel = privateText([`참가자 목록 · ${members.length}명`, ...lines].join('\n'));
       if (pages > 1) {
         const key = `r:${id}:membersPage:${messageId}`;
@@ -106,12 +157,13 @@ export class Interactions {
       const current = await this.repo.recruitment(id);
       if (!current || current.guild_id !== scope.guildId || current.channel_id !== scope.channelId || current.message_id !== messageId) throw new UserError('사용할 수 없는 모집입니다.');
       if (current.owner_id !== scope.userId) throw new UserError('모집자만 모집을 취소할 수 있습니다.');
-      if (current.status !== 'open' || current.ends_at <= Date.now()) throw new UserError('이미 취소되었거나 종료된 모집입니다.');
+      if (current.completed || current.status !== 'open' || current.ends_at <= Date.now()) throw new UserError('이미 취소되었거나 종료된 모집입니다.');
       return { ...privateText('모집을 취소할까요?'), components: [row(button(`r:${id}:cancel:${messageId}`, '모집 취소 확인', 4), button('dismiss', '돌아가기'))] };
     }
     const result = await this.repo.act(interaction.id, id, scope, messageId, action as 'join' | 'leave' | 'cancel');
     await this.sync.run(id);
     const pending = await this.repo.db.prepare('SELECT blocked FROM message_jobs WHERE recruitment_id=?').bind(id).first<{ blocked: number }>();
+    if (action === 'cancel' && result === 'cancelled' && !pending) return closeCancelledPanel;
     return privateText(`${resultTexts[result] ?? '처리했습니다.'}${pending ? pending.blocked ? '\n인원은 저장됐지만 메시지 갱신에 문제가 있습니다. 운영자에게 알려 주세요.' : '\n인원은 저장됐으며 메시지 갱신을 재시도하고 있습니다.' : ''}`);
   }
   private async handleDraft(interaction: Interaction, scope: Scope): Promise<MessagePayload> {
@@ -123,9 +175,16 @@ export class Interactions {
     }
     if (parsed.action === 'page') return draftPanel(draft, parsed.page);
     this.checkVersion(draft, parsed.version);
+    if (parsed.action === 'undoCopy') {
+      const origin = (JSON.parse(draft.payload) as DraftData).copyOrigin;
+      if (!origin) throw new UserError('복사한 모집이 아닙니다.');
+      const previous = await this.repo.draft(origin,scope);
+      await this.repo.discardDraft(draft);
+      return draftPanel(previous,0,'복사를 취소했습니다.');
+    }
     if (parsed.action === 'discard') {
       await this.repo.discardDraft(draft);
-      return privateText('모집 작성을 취소했습니다.');
+      return privateText(draft.edit_id ? '모집 수정을 취소했습니다.' : '모집 작성을 취소했습니다.');
     }
     const data: DraftData = JSON.parse(draft.payload);
     if (parsed.action === 'games') {
@@ -176,11 +235,17 @@ export class Interactions {
       // 검증 실패한 입력도 보존해 다음 Modal에서 바로 수정할 수 있게 한다.
     } else if (parsed.action === 'publish') {
       validateDraft(data);
+      if (draft.edit_id) { await this.repo.editDraft(draft,data,scope); await this.sync.run(draft.edit_id); return privateText('기존 모집글을 수정했습니다.'); }
       const recruitment = await this.repo.publishDraft(draft, data);
       await this.sync.run(recruitment.id);
       const latest = await this.repo.recruitment(recruitment.id);
       return this.publishedPanel(latest?.message_id ?? null, scope, latest?.status === 'publish_failed');
     } else throw new UserError('지원하지 않는 입력입니다.');
+    if (draft.edit_id && interaction.type === 5) {
+      await this.repo.editDraft(draft,data,scope);
+      await this.sync.run(draft.edit_id);
+      return editSaved;
+    }
     draft = await this.repo.saveDraft(draft, data);
     return draftPanel(draft, parsed.page);
   }

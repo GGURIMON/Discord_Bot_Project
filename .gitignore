@@ -8,3 +8,6 @@ coverage/
 !.env.example
 *.log
 .DS_Store
+
+.wrangler-config/
+work-*.py

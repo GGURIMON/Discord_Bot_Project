@@ -39,19 +39,24 @@ export function gamesOf(data: DraftData): Game[] {
   if (games.length > 25) throw new UserError('한 모집에는 최대 25개 게임을 입력할 수 있습니다.');
   return games;
 }
-export function validateDraft(data: DraftData, now = Date.now()) {
+export function timeLabelOf(data:DraftData) {
+  return (data.timeText ?? [data.start,data.end].filter(Boolean).join(' ~ ')).trim().replace(/\b(\d):(?=\d{2}\b)/g,'0$1:');
+}
+export function validateDraft(data: DraftData, now = Date.now(), retainedStart?: number) {
   if (data.roleError) throw new UserError(data.roleError);
   const games = gamesOf(data);
-  const timeLabel = (data.timeText ?? [data.start, data.end].filter(Boolean).join(' ~ ')).trim();
+  const timeLabel = timeLabelOf(data);
   const times = timeLabel.match(/^([01]\d|2[0-3]):([0-5]\d)(?:\s*[~–-]\s*([01]\d|2[0-3]):([0-5]\d))?$/);
   const immediate = ['지금', '지금부터'].includes(timeLabel);
   if (!immediate && !times) throw new UserError('시간은 지금, HH:mm 또는 HH:mm ~ HH:mm으로 입력해 주세요.');
   if (!/^[1-9]\d{0,2}$/.test(data.maximum)) throw new UserError('최대 인원은 1~999 사이의 정수로 입력해 주세요.');
-  const onDate = (hour: string, minute: string) => Date.parse(`${data.date}T${hour}:${minute}:00+09:00`);
-  const startsAt = times ? onDate(times[1]!, times[2]!) : now;
+  const onDate = (hour: string, minute: string) => Date.parse(`${seoulDate(now)}T${hour}:${minute}:00+09:00`);
+  let startsAt = times ? onDate(times[1]!, times[2]!) : now;
+  if (times && startsAt < now) startsAt += 86400000;
+  if (retainedStart !== undefined) startsAt = retainedStart;
   let endsAt = startsAt + 86400000;
   if (times?.[3]) {
-    endsAt = onDate(times[3], times[4]!);
+    endsAt = Date.parse(`${seoulDate(startsAt)}T${times[3]}:${times[4]}:00+09:00`);
     if (endsAt === startsAt) throw new UserError('시작과 종료 시간은 달라야 합니다.');
     if (endsAt < startsAt) endsAt += 86400000;
   }
@@ -66,7 +71,7 @@ export function validateDraft(data: DraftData, now = Date.now()) {
   return { games, startsAt, endsAt, maximum, roles, timeLabel };
 }
 export function formatContent(ownerId: string, games: Game[], start: number, end: number, count: number, max: number, roles: string[], status = 'open', timeLabel?: string | null): string {
-  const prefix = status === 'cancelled' ? '[취소됨] ' : status === 'ended' ? '[종료됨] ' : '';
+  const prefix = status === 'completed' ? '[완료됨] ' : status === 'cancelled' ? '[취소됨] ' : status === 'ended' ? '[종료됨] ' : '';
   const heading = prefix ? `${prefix}모집자 <@${ownerId}>` : `<@${ownerId}>님이 모집 중에 있습니다.`;
   return `${heading}\n${games.map(game => `${game.name}${game.mode ? `(${game.mode})` : ''}`).join(', ')} / ${timeLabel ?? `${clockTime(start)} ~ ${clockTime(end)}`} / [${count}/${max}]${roles.length ? ` / ${roles.map(id => `<@&${id}>`).join(', ')}` : ''}`;
 }

@@ -1,3 +1,6 @@
+import { syncThreadJoins } from './services/threads';
+import { StartReminders } from './services/reminders';
+import { managementOptions } from './components';
 import { Repository } from './database/repository';
 import { errorResponse, Interactions } from './interactions';
 import { verifySignature } from './security';
@@ -20,8 +23,15 @@ export default {
     if (interaction.type === 1) return Response.json({ type: 1 });
     if (![2, 3, 5].includes(interaction.type) || !interaction.id || !interaction.token) return Response.json(errorResponse('지원하지 않는 요청입니다.'));
     if (!interaction.guild_id || !interaction.channel_id || !interaction.member?.user.id) return Response.json(errorResponse('서버 채널에서 /모집을 실행해 주세요.'));
+    const menu = /^r:(\d+):menu$/.exec(interaction.data?.custom_id ?? '');
+    if (interaction.type === 3 && menu && interaction.data) {
+      const selected = interaction.data.values?.[0];
+      if (!interaction.message?.id || !(managementOptions.some(([value])=>value===selected) || selected==='askComplete')) return Response.json(errorResponse('올바르지 않은 선택입니다.'));
+      interaction.data.custom_id = selected === 'members' || selected === 'transferInbox'
+        ? `r:${menu[1]}:${selected}` : `m:${menu[1]}:${selected}:${interaction.message.id}`;
+    }
     const handler = new Interactions(new Repository(env.DB), new Discord(env.DISCORD_BOT_TOKEN));
-    if (interaction.type === 3 && /^d:\d+:\d+:details:/.test(interaction.data?.custom_id ?? '')) {
+    if (interaction.type === 3 && /^(?:d:\d+:\d+:details:|r:\d+:edit$|m:\d+:edit:\d+$)/.test(interaction.data?.custom_id ?? '')) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         return Response.json(await Promise.race([
@@ -50,11 +60,13 @@ export default {
       } finally { clearTimeout(timer); }
     }
     ctx.waitUntil(handler.process(interaction));
-    const updatePrivatePanel = Boolean(interaction.message && interaction.data?.custom_id?.startsWith('d:')) || interaction.data?.custom_id === 'dismiss' || /^r:[^:]+:(?:cancel|membersPage):/.test(interaction.data?.custom_id ?? '');
+    const updatePrivatePanel = Boolean((interaction.message?.flags ?? 0) & 64);
     return Response.json(updatePrivatePanel ? { type: 6 } : { type: 5, data: { flags: 64 } });
   },
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
     const repo = new Repository(env.DB);
+    ctx.waitUntil(syncThreadJoins(env.DB,new Discord(env.DISCORD_BOT_TOKEN)));
+    ctx.waitUntil(new StartReminders(env.DB,new Discord(env.DISCORD_BOT_TOKEN)).drain());
     ctx.waitUntil((async () => { await repo.maintenance(); await new MessageSync(repo, new Discord(env.DISCORD_BOT_TOKEN)).drain(); })());
   },
 } satisfies ExportedHandler<Env>;
